@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/dtomschitz/headless-go-client/logger"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/dtomschitz/headless-go-client/logger"
 )
 
 type (
@@ -17,7 +18,7 @@ type (
 		logger   logger.Logger
 
 		requestBuilder RequestBuilder
-		producers      []Emitter
+		producers      []EventProducer
 
 		interval time.Duration
 		ticker   *time.Ticker
@@ -86,7 +87,7 @@ func NewService(ctx context.Context, endpoint string, interval time.Duration, op
 	return service, nil
 }
 
-func (s *Service) RegisterProducer(e Emitter) {
+func (s *Service) RegisterProducer(e EventProducer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.producers = append(s.producers, e)
@@ -113,7 +114,7 @@ func (s *Service) Start(ctx context.Context) {
 
 func (s *Service) Flush(ctx context.Context) error {
 	s.mu.RLock()
-	producers := make([]Emitter, len(s.producers))
+	producers := make([]EventProducer, len(s.producers))
 	copy(producers, s.producers)
 	s.mu.RUnlock()
 
