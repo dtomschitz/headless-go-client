@@ -5,12 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	commonCtx "github.com/dtomschitz/headless-go-client/context"
-	"github.com/dtomschitz/headless-go-client/logger"
 	"io"
 	"net/http"
 	"os"
 	"time"
+
+	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	"github.com/dtomschitz/headless-go-client/event"
+	"github.com/dtomschitz/headless-go-client/logger"
 )
 
 type (
@@ -19,6 +21,7 @@ type (
 		manifestURL    string
 
 		logger logger.Logger
+		events event.Emitter
 
 		updateRequester   UpdateRequester
 		manifestRequester ManifestRequester
@@ -90,6 +93,16 @@ func WithLogger(l logger.Logger) Option {
 	}
 }
 
+func WithEventEmitter(emitter event.Emitter) Option {
+	return func(ctx context.Context, updater *Updater) error {
+		if emitter == nil {
+			return fmt.Errorf("event emitter cannot be nil")
+		}
+		updater.events = emitter
+		return nil
+	}
+}
+
 func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
 	if currentClientVersion == "" {
 		currentClientVersion = commonCtx.GetStringValue(ctx, commonCtx.ClientVersion)
@@ -107,13 +120,14 @@ func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*U
 		initialPollDelay:    1 * time.Minute,
 		pollInterval:        1 * time.Hour,
 		logger:              logger.New(ctx, nil),
+		events:              &event.NoopEmitter{},
 		updateAvailableChan: make(chan *Manifest),
 		updateAppliedChan:   make(chan *Manifest),
 	}
 
 	for _, opt := range opts {
 		if err := opt(ctx, updater); err != nil {
-			return updater, err
+			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 
@@ -160,6 +174,10 @@ func (updater *Updater) start(ctx context.Context) error {
 
 func (updater *Updater) Close(ctx context.Context) error {
 	return nil
+}
+
+func (updater *Updater) PollEvents() []event.Event {
+	return updater.events.PollEvents()
 }
 
 func (updater *Updater) ListenForUpdateAvailable(ctx context.Context, fn func(ctx context.Context, manifest *Manifest)) {
