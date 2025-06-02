@@ -26,7 +26,7 @@ func (m *MockCloser) Close(ctx context.Context) error {
 func TestManager_RegisterAndClose(t *testing.T) {
 	t.Run("CloseAllWithoutErrors", func(t *testing.T) {
 		//given
-		manager := lifecycle.New()
+		manager := lifecycle.NewCloser()
 		closer1 := &MockCloser{}
 		closer2 := &MockCloser{}
 
@@ -34,7 +34,7 @@ func TestManager_RegisterAndClose(t *testing.T) {
 		manager.Register(closer2)
 
 		//when
-		err := manager.Close(context.Background())
+		err := manager.CloseAll(context.Background())
 
 		//then
 		assert.NoError(t, err, "expected no error when closing all closers")
@@ -44,7 +44,7 @@ func TestManager_RegisterAndClose(t *testing.T) {
 
 	t.Run("CloseAllWithErrors", func(t *testing.T) {
 		//given
-		manager := lifecycle.New()
+		manager := lifecycle.NewCloser()
 		closer1 := &MockCloser{closeErr: errors.New("error closing closer1")}
 		closer2 := &MockCloser{closeErr: errors.New("error closing closer2")}
 
@@ -52,7 +52,7 @@ func TestManager_RegisterAndClose(t *testing.T) {
 		manager.Register(closer2)
 
 		//when
-		err := manager.Close(context.Background())
+		err := manager.CloseAll(context.Background())
 
 		//then
 		assert.Error(t, err, "expected error when closing all closers")
@@ -63,8 +63,8 @@ func TestManager_RegisterAndClose(t *testing.T) {
 	})
 
 	t.Run("CloseEmptyManager", func(t *testing.T) {
-		manager := lifecycle.New()
-		err := manager.Close(context.Background())
+		manager := lifecycle.NewCloser()
+		err := manager.CloseAll(context.Background())
 		assert.NoError(t, err, "expected no error when closing an empty manager")
 	})
 }
