@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/dtomschitz/headless-go-client/pkg/updater"
+	"github.com/dtomschitz/headless-go-client/updater"
 	"log"
 )
 
