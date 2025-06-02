@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	commonCtx "github.com/dtomschitz/headless-go-client/pkg/context"
-	"github.com/dtomschitz/headless-go-client/pkg/logger"
+	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	"github.com/dtomschitz/headless-go-client/logger"
 	"io"
 	"net/http"
 	"os"
@@ -102,7 +102,7 @@ func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*U
 
 	updater := &Updater{
 		currentVersion:      currentClientVersion,
-		updateRequester:     &DefaultUpdateRequester{client: httpClient},
+		updateRequester:     &DefaultUpdateRequester{Client: httpClient},
 		manifestRequester:   &DefaultManifestRequester{client: httpClient},
 		initialPollDelay:    1 * time.Minute,
 		pollInterval:        1 * time.Hour,
@@ -209,9 +209,9 @@ func (updater *Updater) TriggerUpdateCheck(ctx context.Context) error {
 func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) error {
 	updater.logger.Infof("going to apply update with version %s", manifest.Version)
 
-	binary, err := updater.updateRequester.Fetch(ctx, manifest.URL)
+	binary, err := updater.updateRequester.Fetch(ctx, manifest)
 	if err != nil {
-		return fmt.Errorf("failed to fetch update: %w", err)
+		return fmt.Errorf("failed to fetch update %s: %w", manifest.Version, err)
 	}
 	defer binary.Close()
 
