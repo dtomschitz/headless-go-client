@@ -144,17 +144,10 @@ func (updater *Updater) start(ctx context.Context) error {
 				updater.logger.Warn("self updater stopped because context was cancelled")
 				return
 			case <-ticker.C:
-				manifest, isAvailable, err := updater.checkIfUpdateIsAvailable(ctx)
-				if err != nil {
-					updater.logger.Errorf("failed to check if update is available: %v", err)
+				if err := updater.TriggerUpdateCheck(ctx); err != nil {
+					updater.logger.Errorf("failed to trigger update check: %v", err)
 					return
 				}
-
-				if !isAvailable {
-					updater.logger.Info("no update is available")
-				}
-
-				updater.updateAvailableChan <- manifest
 			}
 		}
 	}()
@@ -194,6 +187,21 @@ func (updater *Updater) eventListener(ctx context.Context, updateChan chan *Mani
 			}
 		}
 	}()
+}
+
+func (updater *Updater) TriggerUpdateCheck(ctx context.Context) error {
+	manifest, isAvailable, err := updater.checkIfUpdateIsAvailable(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check for updates: %w", err)
+	}
+
+	if !isAvailable {
+		updater.logger.Info("no update is available")
+		return nil
+	}
+
+	updater.updateAvailableChan <- manifest
+	return nil
 }
 
 func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) error {
