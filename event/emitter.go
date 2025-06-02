@@ -11,8 +11,9 @@ type (
 		Close(ctx context.Context) error
 	}
 
-	EventProducer interface {
+	Producer interface {
 		PollEvents() []Event
+		Close(ctx context.Context) error
 	}
 
 	NoopEmitter struct{}

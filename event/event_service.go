@@ -18,7 +18,7 @@ type (
 		logger   logger.Logger
 
 		requestBuilder RequestBuilder
-		producers      []EventProducer
+		producers      []Producer
 
 		interval time.Duration
 		ticker   *time.Ticker
@@ -87,7 +87,7 @@ func NewService(ctx context.Context, endpoint string, interval time.Duration, op
 	return service, nil
 }
 
-func (s *Service) RegisterProducer(e EventProducer) {
+func (s *Service) RegisterProducer(e Producer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.producers = append(s.producers, e)
@@ -114,7 +114,7 @@ func (s *Service) Start(ctx context.Context) {
 
 func (s *Service) Flush(ctx context.Context) error {
 	s.mu.RLock()
-	producers := make([]EventProducer, len(s.producers))
+	producers := make([]Producer, len(s.producers))
 	copy(producers, s.producers)
 	s.mu.RUnlock()
 
@@ -149,6 +149,17 @@ func (s *Service) Close(ctx context.Context) error {
 	s.shutdownOnce.Do(func() {
 		s.ticker.Stop()
 	})
+
+	s.mu.RLock()
+	producers := make([]Producer, len(s.producers))
+	copy(producers, s.producers)
+	s.mu.RUnlock()
+
+	for _, p := range producers {
+		if err := p.Close(ctx); err != nil {
+			s.logger.Errorf("failed to close event producer: %v", err)
+		}
+	}
 
 	done := make(chan struct{})
 	go func() {
