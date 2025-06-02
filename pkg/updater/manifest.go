@@ -15,19 +15,23 @@ type (
 	}
 
 	ManifestRequester interface {
-		Fetch(ctx context.Context, client *http.Client, url string) (*Manifest, error)
+		Fetch(ctx context.Context, url string) (*Manifest, error)
 	}
 )
 
-type DefaultManifestRequester struct{}
+type DefaultManifestRequester struct {
+	client *http.Client
+}
 
-func (requester *DefaultManifestRequester) Fetch(ctx context.Context, client *http.Client, url string) (*Manifest, error) {
+var _ ManifestRequester = &DefaultManifestRequester{}
+
+func (requester *DefaultManifestRequester) Fetch(ctx context.Context, url string) (*Manifest, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := requester.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("get manifest: %w", err)
 	}

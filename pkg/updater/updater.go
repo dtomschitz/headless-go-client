@@ -16,12 +16,12 @@ import (
 type (
 	Updater struct {
 		currentVersion string
+		manifestURL    string
 
-		manifestUrlBuilder func(ctx context.Context, currentClientVersion string) (string, error)
+		logger logger.Logger
 
 		updateRequester   UpdateRequester
 		manifestRequester ManifestRequester
-		logger            logger.Logger
 
 		initialPollDelay time.Duration
 		pollInterval     time.Duration
@@ -98,10 +98,12 @@ func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*U
 		}
 	}
 
+	httpClient := &http.Client{}
+
 	updater := &Updater{
 		currentVersion:      currentClientVersion,
-		updateRequester:     &DefaultUpdateRequester{},
-		manifestRequester:   &DefaultManifestRequester{},
+		updateRequester:     &DefaultUpdateRequester{client: httpClient},
+		manifestRequester:   &DefaultManifestRequester{client: httpClient},
 		initialPollDelay:    1 * time.Minute,
 		pollInterval:        1 * time.Hour,
 		logger:              logger.New(ctx, nil),
@@ -207,7 +209,7 @@ func (updater *Updater) TriggerUpdateCheck(ctx context.Context) error {
 func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) error {
 	updater.logger.Infof("going to apply update with version %s", manifest.Version)
 
-	binary, err := updater.updateRequester.Fetch(ctx, &http.Client{}, manifest.URL)
+	binary, err := updater.updateRequester.Fetch(ctx, manifest.URL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch update: %w", err)
 	}
@@ -251,12 +253,7 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) err
 }
 
 func (updater *Updater) checkIfUpdateIsAvailable(ctx context.Context) (*Manifest, bool, error) {
-	url, err := updater.manifestUrlBuilder(ctx, updater.currentVersion)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to build manifest URL: %w", err)
-	}
-
-	manifest, err := updater.manifestRequester.Fetch(ctx, &http.Client{}, url)
+	manifest, err := updater.manifestRequester.Fetch(ctx, updater.manifestURL)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to fetch manifest: %w", err)
 	}

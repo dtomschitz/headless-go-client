@@ -9,19 +9,23 @@ import (
 
 type (
 	UpdateRequester interface {
-		Fetch(ctx context.Context, client *http.Client, url string) (io.ReadCloser, error)
+		Fetch(ctx context.Context, url string) (io.ReadCloser, error)
 	}
 )
 
-type DefaultUpdateRequester struct{}
+type DefaultUpdateRequester struct {
+	client *http.Client
+}
 
-func (requester *DefaultUpdateRequester) Fetch(ctx context.Context, client *http.Client, url string) (io.ReadCloser, error) {
+var _ UpdateRequester = &DefaultUpdateRequester{}
+
+func (requester *DefaultUpdateRequester) Fetch(ctx context.Context, url string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := requester.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL %s: %w", url, err)
 	}
