@@ -158,6 +158,10 @@ func (updater *Updater) start(ctx context.Context) error {
 	return nil
 }
 
+func (updater *Updater) Close(ctx context.Context) error {
+	return nil
+}
+
 func (updater *Updater) ListenForUpdateAvailable(ctx context.Context, fn func(ctx context.Context, manifest *Manifest)) {
 	updater.eventListener(ctx, updater.updateAvailableChan, func(ctx context.Context, manifest *Manifest) {
 		if manifest == nil {
