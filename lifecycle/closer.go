@@ -10,22 +10,22 @@ type Closer interface {
 	Close(ctx context.Context) error
 }
 
-type Manager struct {
+type LifecycleService struct {
 	mu      sync.Mutex
 	closers []Closer
 }
 
-func NewCloser() *Manager {
-	return &Manager{}
+func NewLifecycleService() *LifecycleService {
+	return &LifecycleService{}
 }
 
-func (m *Manager) Register(c Closer) {
+func (m *LifecycleService) Register(c Closer) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.closers = append([]Closer{c}, m.closers...)
 }
 
-func (m *Manager) CloseAll(ctx context.Context) error {
+func (m *LifecycleService) CloseAll(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
