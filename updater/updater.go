@@ -36,72 +36,7 @@ type (
 	UpdateEvent struct {
 		Version string
 	}
-
-	Option func(context.Context, *Updater) error
 )
-
-func WithUpdateRequester(requester UpdateRequester) Option {
-	return func(ctx context.Context, updater *Updater) error {
-		if requester == nil {
-			return nil
-		}
-		updater.updateRequester = requester
-		return nil
-	}
-}
-
-func WithManifestRequester(requester ManifestRequester) Option {
-	return func(ctx context.Context, updater *Updater) error {
-		if requester == nil {
-			return nil
-		}
-		updater.manifestRequester = requester
-		return nil
-	}
-}
-
-func WithPollInterval(d time.Duration) Option {
-	return func(ctx context.Context, updater *Updater) error {
-		if d <= 0 {
-			return fmt.Errorf("poll interval must be greater than 0")
-		}
-
-		updater.pollInterval = d
-		return nil
-	}
-}
-
-func WithInitialPollDelay(d time.Duration) Option {
-	return func(ctx context.Context, updater *Updater) error {
-		if d < 0 {
-			return fmt.Errorf("initial poll delay cannot be negative")
-		}
-
-		updater.initialPollDelay = d
-		return nil
-	}
-}
-
-func WithLogger(l logger.Logger) Option {
-	return func(ctx context.Context, updater *Updater) error {
-		if l == nil {
-			return fmt.Errorf("logger cannot be nil")
-		}
-
-		updater.logger = l
-		return nil
-	}
-}
-
-func WithEventEmitter(emitter event.Emitter) Option {
-	return func(ctx context.Context, updater *Updater) error {
-		if emitter == nil {
-			return fmt.Errorf("event emitter cannot be nil")
-		}
-		updater.events = emitter
-		return nil
-	}
-}
 
 func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
 	if currentClientVersion == "" {
@@ -150,10 +85,10 @@ func (updater *Updater) start(ctx context.Context) error {
 		}
 	}
 
-	ticker := time.NewTicker(updater.pollInterval)
-	defer ticker.Stop()
-
 	go func() {
+		ticker := time.NewTicker(updater.pollInterval)
+		defer ticker.Stop()
+
 		for {
 			select {
 			case <-ctx.Done():
