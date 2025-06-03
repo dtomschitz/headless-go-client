@@ -2,9 +2,10 @@ package context_test
 
 import (
 	"context"
-	commonCtx "github.com/dtomschitz/headless-go-client/pkg/context"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_GetStringValue(t *testing.T) {
