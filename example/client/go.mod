@@ -1,4 +1,4 @@
-module example
+module github.com/dtomschitz/headless-go-client/example/client
 
 go 1.24
 
