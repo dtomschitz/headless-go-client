@@ -74,7 +74,7 @@ func (cs *ConfigService) start(ctx context.Context) error {
 			cs.logger.Info("waiting for initial poll delay of %s before starting ConfigService", cs.initialPollDelay)
 			select {
 			case <-ctx.Done():
-				cs.logger.Warn("ConfigService stopped because context was cancelled")
+				cs.logger.Warn("stopped ConfigService because context was cancelled")
 				return
 			case <-time.After(cs.initialPollDelay):
 				cs.logger.Info("initial poll delay completed, starting ConfigService")

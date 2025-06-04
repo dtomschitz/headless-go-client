@@ -81,13 +81,13 @@ func (updater *Updater) start(ctx context.Context) error {
 
 	go func() {
 		if updater.initialPollDelay > 0 {
-			updater.logger.Info("waiting for initial poll delay of %s before starting self updater", updater.initialPollDelay)
+			updater.logger.Info("waiting for initial poll delay of %s before starting SelfUpdater", updater.initialPollDelay)
 			select {
 			case <-ctx.Done():
-				updater.logger.Warn("self updater stopped because context was cancelled")
+				updater.logger.Warn("stopped SelfUpdater because context was cancelled")
 				return
 			case <-time.After(updater.initialPollDelay):
-				updater.logger.Info("initial poll delay completed, starting self updater")
+				updater.logger.Info("initial poll delay completed, starting SelfUpdater")
 			}
 		}
 
@@ -97,7 +97,7 @@ func (updater *Updater) start(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				updater.logger.Warn("self updater stopped because context was cancelled")
+				updater.logger.Warn("stopped SelfUpdater because context was cancelled")
 				return
 			case <-ticker.C:
 				if err := updater.TriggerUpdateCheck(ctx); err != nil {
