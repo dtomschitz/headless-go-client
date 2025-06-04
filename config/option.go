@@ -35,7 +35,7 @@ func WithInitialPollDelay(d time.Duration) ConfigServiceOption {
 
 func WithHTTPClient(client *http.Client) ConfigServiceOption {
 	return func(ctx context.Context, service *ConfigService) error {
-		if client != nil {
+		if client == nil {
 			return errors.New("http client is not provided")
 		}
 
@@ -46,7 +46,7 @@ func WithHTTPClient(client *http.Client) ConfigServiceOption {
 
 func WithLogger(logger logger.Logger) ConfigServiceOption {
 	return func(ctx context.Context, service *ConfigService) error {
-		if logger != nil {
+		if logger == nil {
 			return errors.New("logger is not provided")
 		}
 

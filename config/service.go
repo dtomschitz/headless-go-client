@@ -60,7 +60,7 @@ func NewConfigService(ctx context.Context, url string, opts ...ConfigServiceOpti
 
 	if service.current == nil {
 		if err := service.Refresh(ctx); err != nil {
-			service.logger.Errorf("failed to load initial config from remote: %w", err)
+			service.logger.Error("failed to load initial config from remote: %w", err)
 		}
 	}
 
@@ -69,7 +69,7 @@ func NewConfigService(ctx context.Context, url string, opts ...ConfigServiceOpti
 
 func (cs *ConfigService) start(ctx context.Context) error {
 	if cs.initialPollDelay > 0 {
-		cs.logger.Infof("waiting for initial poll delay of %s before starting ConfigService", cs.initialPollDelay)
+		cs.logger.Info("waiting for initial poll delay of %s before starting ConfigService", cs.initialPollDelay)
 		select {
 		case <-ctx.Done():
 			cs.logger.Warn("ConfigService stopped because context was cancelled")
@@ -90,13 +90,13 @@ func (cs *ConfigService) start(ctx context.Context) error {
 				return
 			case <-ticker.C:
 				if err := cs.Refresh(ctx); err != nil {
-					cs.logger.Errorf("failed to refresh config: %v", err)
+					cs.logger.Error("failed to refresh config: %v", err)
 				}
 			}
 		}
 	}()
 
-	cs.logger.Infof("ConfigService started successfully with poll interval of %s", cs.pollInterval)
+	cs.logger.Info("ConfigService started successfully with poll interval of %s", cs.pollInterval)
 
 	return nil
 }
@@ -130,7 +130,7 @@ func (cs *ConfigService) Refresh(ctx context.Context) error {
 	defer cs.mu.Unlock()
 
 	if config.Version == cs.current.Version {
-		cs.logger.Debugf("config version %d is up to date", config.Version)
+		cs.logger.Debug("config version %d is up to date", config.Version)
 		return nil
 	}
 

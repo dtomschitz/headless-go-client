@@ -157,7 +157,7 @@ func (s *Service) Close(ctx context.Context) error {
 
 	for _, p := range producers {
 		if err := p.Close(ctx); err != nil {
-			s.logger.Errorf("failed to close event producer: %v", err)
+			s.logger.Error("failed to close event producer: %v", err)
 		}
 	}
 

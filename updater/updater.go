@@ -80,7 +80,7 @@ func (updater *Updater) start(ctx context.Context) error {
 	}
 
 	if updater.initialPollDelay > 0 {
-		updater.logger.Infof("waiting for initial poll delay of %s before starting self updater", updater.initialPollDelay)
+		updater.logger.Info("waiting for initial poll delay of %s before starting self updater", updater.initialPollDelay)
 		select {
 		case <-ctx.Done():
 			updater.logger.Warn("self updater stopped because context was cancelled")
@@ -101,14 +101,14 @@ func (updater *Updater) start(ctx context.Context) error {
 				return
 			case <-ticker.C:
 				if err := updater.TriggerUpdateCheck(ctx); err != nil {
-					updater.logger.Errorf("failed to trigger update check: %v", err)
+					updater.logger.Error("failed to trigger update check: %v", err)
 					return
 				}
 			}
 		}
 	}()
 
-	updater.logger.Infof("self updater started successfully with poll interval of %s", updater.pollInterval)
+	updater.logger.Info("self updater started successfully with poll interval of %s", updater.pollInterval)
 	return nil
 }
 
@@ -127,7 +127,7 @@ func (updater *Updater) ListenForUpdateAvailable(ctx context.Context, fn UpdateE
 		}
 
 		updater.events.Push(event.NewEvent(ctx, UpdateAvailableEvent, event.WithDataField("manifest", manifest)))
-		updater.logger.Infof("new update is available: %s", manifest.Version)
+		updater.logger.Info("new update is available: %s", manifest.Version)
 
 		fn(ctx, manifest)
 	})
@@ -140,7 +140,7 @@ func (updater *Updater) ListenForUpdateApplied(ctx context.Context, fn UpdateEve
 		}
 
 		updater.events.Push(event.NewEvent(ctx, UpdateAppliedEvent, event.WithDataField("manifest", manifest)))
-		updater.logger.Infof("new update has been applied: %s", manifest.Version)
+		updater.logger.Info("new update has been applied: %s", manifest.Version)
 
 		fn(ctx, manifest)
 	})
@@ -177,7 +177,7 @@ func (updater *Updater) TriggerUpdateCheck(ctx context.Context) error {
 func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) error {
 	eventOpts := event.WithDataField("manifest", manifest)
 
-	updater.logger.Infof("going to apply update with version %s", manifest.Version)
+	updater.logger.Info("going to apply update with version %s", manifest.Version)
 	updater.events.Push(event.NewEvent(ctx, UpdateDownloadStartedEvent, eventOpts))
 
 	binary, err := updater.updateRequester.Fetch(ctx, manifest)
@@ -187,7 +187,7 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) err
 	defer binary.Close()
 
 	updater.events.Push(event.NewEvent(ctx, UpdateDownloadedEvent, eventOpts))
-	updater.logger.Debugf("update with version %s fetched successfully", manifest.Version)
+	updater.logger.Debug("update with version %s fetched successfully", manifest.Version)
 
 	execPath, err := os.Executable()
 	if err != nil {
