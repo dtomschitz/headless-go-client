@@ -8,12 +8,17 @@ import (
 
 	"github.com/dtomschitz/headless-go-client/lifecycle"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type MockCloser struct {
 	mu       sync.Mutex
 	closed   bool
 	closeErr error
+}
+
+func (m *MockCloser) Name() string {
+	return "MockCloser"
 }
 
 func (m *MockCloser) Close(ctx context.Context) error {
@@ -26,7 +31,9 @@ func (m *MockCloser) Close(ctx context.Context) error {
 func TestManager_RegisterAndClose(t *testing.T) {
 	t.Run("CloseAllWithoutErrors", func(t *testing.T) {
 		//given
-		manager := lifecycle.NewLifecycleService()
+		manager, err := lifecycle.NewLifecycleService(context.Background())
+		require.NoError(t, err)
+
 		closer1 := &MockCloser{}
 		closer2 := &MockCloser{}
 
@@ -34,7 +41,7 @@ func TestManager_RegisterAndClose(t *testing.T) {
 		manager.Register(closer2)
 
 		//when
-		err := manager.CloseAll(context.Background())
+		err = manager.CloseAll(context.Background())
 
 		//then
 		assert.NoError(t, err, "expected no error when closing all closers")
@@ -44,7 +51,9 @@ func TestManager_RegisterAndClose(t *testing.T) {
 
 	t.Run("CloseAllWithErrors", func(t *testing.T) {
 		//given
-		manager := lifecycle.NewLifecycleService()
+		manager, err := lifecycle.NewLifecycleService(context.Background())
+		require.NoError(t, err)
+
 		closer1 := &MockCloser{closeErr: errors.New("error closing closer1")}
 		closer2 := &MockCloser{closeErr: errors.New("error closing closer2")}
 
@@ -52,7 +61,7 @@ func TestManager_RegisterAndClose(t *testing.T) {
 		manager.Register(closer2)
 
 		//when
-		err := manager.CloseAll(context.Background())
+		err = manager.CloseAll(context.Background())
 
 		//then
 		assert.Error(t, err, "expected error when closing all closers")
@@ -63,8 +72,10 @@ func TestManager_RegisterAndClose(t *testing.T) {
 	})
 
 	t.Run("CloseEmptyManager", func(t *testing.T) {
-		manager := lifecycle.NewLifecycleService()
-		err := manager.CloseAll(context.Background())
+		manager, err := lifecycle.NewLifecycleService(context.Background())
+		require.NoError(t, err)
+
+		err = manager.CloseAll(context.Background())
 		assert.NoError(t, err, "expected no error when closing an empty manager")
 	})
 }

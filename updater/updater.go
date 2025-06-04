@@ -112,6 +112,10 @@ func (updater *Updater) start(ctx context.Context) error {
 	return nil
 }
 
+func (updater *Updater) Name() string {
+	return "Updater"
+}
+
 func (updater *Updater) Close(ctx context.Context) error {
 	return nil
 }

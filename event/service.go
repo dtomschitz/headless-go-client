@@ -14,6 +14,9 @@ import (
 
 type (
 	Service struct {
+		ctx       context.Context
+		cancelCtx context.CancelFunc
+
 		endpoint string
 		logger   logger.Logger
 
@@ -21,7 +24,6 @@ type (
 		producers      []Producer
 
 		interval time.Duration
-		ticker   *time.Ticker
 		client   *http.Client
 
 		wg           sync.WaitGroup
@@ -71,7 +73,12 @@ func WithLogger(logger logger.Logger) ServiceOption {
 }
 
 func NewService(ctx context.Context, endpoint string, interval time.Duration, opts ...ServiceOption) (*Service, error) {
+	innerCtx, innerCancel := context.WithCancel(ctx)
+
 	service := &Service{
+		ctx:       innerCtx,
+		cancelCtx: innerCancel,
+
 		endpoint:       endpoint,
 		interval:       interval,
 		client:         &http.Client{Timeout: 5 * time.Second},
@@ -93,17 +100,19 @@ func (s *Service) RegisterProducer(e Producer) {
 	s.producers = append(s.producers, e)
 }
 
-func (s *Service) Start(ctx context.Context) {
-	s.ticker = time.NewTicker(s.interval)
+func (s *Service) Start() {
 	s.wg.Add(1)
 	go func() {
+		ticker := time.NewTicker(s.interval)
+		defer ticker.Stop()
 		defer s.wg.Done()
+
 		for {
 			select {
-			case <-ctx.Done():
+			case <-s.ctx.Done():
 				return
-			case <-s.ticker.C:
-				err := s.Flush(ctx)
+			case <-ticker.C:
+				err := s.Flush(s.ctx)
 				if err != nil {
 					return
 				}
@@ -145,9 +154,15 @@ func (s *Service) Flush(ctx context.Context) error {
 	return nil
 }
 
+func (s *Service) Name() string {
+	return "EventService"
+}
+
 func (s *Service) Close(ctx context.Context) error {
 	s.shutdownOnce.Do(func() {
-		s.ticker.Stop()
+		if s.ctx != nil && s.cancelCtx != nil {
+			s.cancelCtx()
+		}
 	})
 
 	s.mu.RLock()

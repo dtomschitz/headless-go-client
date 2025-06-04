@@ -68,7 +68,6 @@ func NewConfigService(ctx context.Context, url string, opts ...ConfigServiceOpti
 }
 
 func (cs *ConfigService) start(ctx context.Context) error {
-
 	go func() {
 		if cs.initialPollDelay > 0 {
 			cs.logger.Info("waiting for initial poll delay of %s before starting ConfigService", cs.initialPollDelay)
@@ -100,6 +99,10 @@ func (cs *ConfigService) start(ctx context.Context) error {
 	cs.logger.Info("ConfigService started successfully with poll interval of %s", cs.pollInterval)
 
 	return nil
+}
+
+func (cs *ConfigService) Name() string {
+	return "ConfigService"
 }
 
 func (cs *ConfigService) Close(ctx context.Context) error {
