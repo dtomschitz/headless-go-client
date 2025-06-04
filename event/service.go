@@ -31,11 +31,11 @@ type (
 
 	ServiceOption func(context.Context, *Service) (string, error)
 
-	RequestBuilder func(ctx context.Context, events []Event) (*http.Request, error)
+	RequestBuilder func(ctx context.Context, events []*Event) (*http.Request, error)
 )
 
 func defaultRequestBuilder(endpoint string) RequestBuilder {
-	return func(ctx context.Context, events []Event) (*http.Request, error) {
+	return func(ctx context.Context, events []*Event) (*http.Request, error) {
 		payload, err := json.Marshal(events)
 		if err != nil {
 			return nil, err
@@ -118,7 +118,7 @@ func (s *Service) Flush(ctx context.Context) error {
 	copy(producers, s.producers)
 	s.mu.RUnlock()
 
-	var batch []Event
+	var batch []*Event
 	for _, p := range producers {
 		batch = append(batch, p.PollEvents()...)
 	}

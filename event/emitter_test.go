@@ -2,10 +2,11 @@ package event_test
 
 import (
 	"context"
-	"github.com/dtomschitz/headless-go-client/event"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/dtomschitz/headless-go-client/event"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -17,8 +18,8 @@ func TestBufferedEmitter_PushAndPoll(t *testing.T) {
 
 	defer emitter.Close(context.Background())
 
-	emitter.Push(event.Event{Message: "test1"})
-	emitter.Push(event.Event{Message: "test2"})
+	emitter.Push(&event.Event{Message: "test1"})
+	emitter.Push(&event.Event{Message: "test2"})
 
 	// Let goroutine process queue
 	time.Sleep(10 * time.Millisecond)
@@ -36,7 +37,7 @@ func TestBufferedEmitter_BufferClearsAfterPoll(t *testing.T) {
 
 	defer emitter.Close(context.Background())
 
-	emitter.Push(event.Event{Message: "one"})
+	emitter.Push(&event.Event{Message: "one"})
 	time.Sleep(10 * time.Millisecond)
 
 	events := emitter.PollEvents()
@@ -48,23 +49,23 @@ func TestBufferedEmitter_BufferClearsAfterPoll(t *testing.T) {
 }
 
 func TestBufferedEmitter_DropCallbackCalled(t *testing.T) {
-	var dropped []event.Event
+	var dropped []*event.Event
 	var mu sync.Mutex
 
 	emitter := event.NewBufferedEmitter(event.BufferedEmitterConfig{
 		BufferSize: 1,
-		DropCallback: func(evt event.Event) {
+		DropCallback: func(event *event.Event) {
 			mu.Lock()
 			defer mu.Unlock()
-			dropped = append(dropped, evt)
+			dropped = append(dropped, event)
 		},
 	})
 
 	defer emitter.Close(context.Background())
 
 	// Fill the buffer
-	emitter.Push(event.Event{Message: "ok"})
-	emitter.Push(event.Event{Message: "drop me"})
+	emitter.Push(&event.Event{Message: "ok"})
+	emitter.Push(&event.Event{Message: "drop me"})
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -88,7 +89,7 @@ func TestBufferedEmitter_Close(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		emitter.Push(event.Event{Message: "ignored"})
+		emitter.Push(&event.Event{Message: "ignored"})
 	}()
 	select {
 	case <-done:

@@ -8,6 +8,7 @@ type (
 
 const (
 	ClientVersion Key = "client_version"
+	DeviceId      Key = "device_id"
 )
 
 func GetStringValue(ctx context.Context, key Key) string {

@@ -7,16 +7,16 @@ import (
 
 type (
 	BufferedEmitter struct {
-		queue        chan Event
+		queue        chan *Event
 		bufferMu     sync.Mutex
-		buffer       []Event
-		dropCallback func(Event)
+		buffer       []*Event
+		dropCallback func(*Event)
 		closed       chan struct{}
 	}
 
 	BufferedEmitterConfig struct {
 		BufferSize   int
-		DropCallback func(evt Event)
+		DropCallback func(event *Event)
 	}
 )
 
@@ -26,8 +26,8 @@ func NewBufferedEmitter(config BufferedEmitterConfig) Emitter {
 	}
 
 	e := &BufferedEmitter{
-		queue:        make(chan Event, config.BufferSize),
-		buffer:       make([]Event, 0),
+		queue:        make(chan *Event, config.BufferSize),
+		buffer:       make([]*Event, 0),
 		dropCallback: config.DropCallback,
 		closed:       make(chan struct{}),
 	}
@@ -49,25 +49,25 @@ func NewBufferedEmitter(config BufferedEmitterConfig) Emitter {
 }
 
 // Push adds an event to the emitter queue. If the queue is full, it will drop the event and call the drop callback if provided.
-func (e *BufferedEmitter) Push(evt Event) {
+func (e *BufferedEmitter) Push(event *Event) {
 	select {
 	case <-e.closed:
 		if e.dropCallback != nil {
-			e.dropCallback(evt)
+			e.dropCallback(event)
 		}
 	default:
 		select {
-		case e.queue <- evt:
+		case e.queue <- event:
 		default:
 			if e.dropCallback != nil {
-				e.dropCallback(evt)
+				e.dropCallback(event)
 			}
 		}
 	}
 }
 
 // PollEvents returns and clears current event buffer
-func (e *BufferedEmitter) PollEvents() []Event {
+func (e *BufferedEmitter) PollEvents() []*Event {
 	e.bufferMu.Lock()
 	defer e.bufferMu.Unlock()
 	events := e.buffer

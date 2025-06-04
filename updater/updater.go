@@ -33,9 +33,14 @@ type (
 		updateAppliedChan   chan *Manifest
 	}
 
-	UpdateEvent struct {
-		Version string
-	}
+	UpdateEventFunc func(ctx context.Context, mainfest *Manifest)
+)
+
+const (
+	UpdateAvailableEvent       event.EventType = "update_available"
+	UpdateDownloadStartedEvent event.EventType = "update_download_started"
+	UpdateDownloadedEvent      event.EventType = "update_downloaded"
+	UpdateAppliedEvent         event.EventType = "update_applied"
 )
 
 func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
@@ -111,31 +116,37 @@ func (updater *Updater) Close(ctx context.Context) error {
 	return nil
 }
 
-func (updater *Updater) PollEvents() []event.Event {
+func (updater *Updater) PollEvents() []*event.Event {
 	return updater.events.PollEvents()
 }
 
-func (updater *Updater) ListenForUpdateAvailable(ctx context.Context, fn func(ctx context.Context, manifest *Manifest)) {
+func (updater *Updater) ListenForUpdateAvailable(ctx context.Context, fn UpdateEventFunc) {
 	updater.eventListener(ctx, updater.updateAvailableChan, func(ctx context.Context, manifest *Manifest) {
 		if manifest == nil {
 			return
 		}
+
+		updater.events.Push(event.NewEvent(ctx, UpdateAvailableEvent, event.WithDataField("manifest", manifest)))
 		updater.logger.Infof("new update is available: %s", manifest.Version)
+
 		fn(ctx, manifest)
 	})
 }
 
-func (updater *Updater) ListenForUpdateApplied(ctx context.Context, fn func(ctx context.Context, manifest *Manifest)) {
+func (updater *Updater) ListenForUpdateApplied(ctx context.Context, fn UpdateEventFunc) {
 	updater.eventListener(ctx, updater.updateAppliedChan, func(ctx context.Context, manifest *Manifest) {
 		if manifest == nil {
 			return
 		}
+
+		updater.events.Push(event.NewEvent(ctx, UpdateAppliedEvent, event.WithDataField("manifest", manifest)))
 		updater.logger.Infof("new update has been applied: %s", manifest.Version)
+
 		fn(ctx, manifest)
 	})
 }
 
-func (updater *Updater) eventListener(ctx context.Context, updateChan chan *Manifest, fn func(ctx context.Context, manifest *Manifest)) {
+func (updater *Updater) eventListener(ctx context.Context, updateChan chan *Manifest, fn UpdateEventFunc) {
 	go func() {
 		for {
 			select {
@@ -164,7 +175,10 @@ func (updater *Updater) TriggerUpdateCheck(ctx context.Context) error {
 }
 
 func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) error {
+	eventOpts := event.WithDataField("manifest", manifest)
+
 	updater.logger.Infof("going to apply update with version %s", manifest.Version)
+	updater.events.Push(event.NewEvent(ctx, UpdateDownloadStartedEvent, eventOpts))
 
 	binary, err := updater.updateRequester.Fetch(ctx, manifest)
 	if err != nil {
@@ -172,6 +186,7 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) err
 	}
 	defer binary.Close()
 
+	updater.events.Push(event.NewEvent(ctx, UpdateDownloadedEvent, eventOpts))
 	updater.logger.Debugf("update with version %s fetched successfully", manifest.Version)
 
 	execPath, err := os.Executable()
