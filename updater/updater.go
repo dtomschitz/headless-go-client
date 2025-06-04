@@ -79,18 +79,18 @@ func (updater *Updater) start(ctx context.Context) error {
 		return fmt.Errorf("updater requester cannot be nil")
 	}
 
-	if updater.initialPollDelay > 0 {
-		updater.logger.Info("waiting for initial poll delay of %s before starting self updater", updater.initialPollDelay)
-		select {
-		case <-ctx.Done():
-			updater.logger.Warn("self updater stopped because context was cancelled")
-			return ctx.Err()
-		case <-time.After(updater.initialPollDelay):
-			updater.logger.Info("initial poll delay completed, starting self updater")
-		}
-	}
-
 	go func() {
+		if updater.initialPollDelay > 0 {
+			updater.logger.Info("waiting for initial poll delay of %s before starting self updater", updater.initialPollDelay)
+			select {
+			case <-ctx.Done():
+				updater.logger.Warn("self updater stopped because context was cancelled")
+				return
+			case <-time.After(updater.initialPollDelay):
+				updater.logger.Info("initial poll delay completed, starting self updater")
+			}
+		}
+
 		ticker := time.NewTicker(updater.pollInterval)
 		defer ticker.Stop()
 
