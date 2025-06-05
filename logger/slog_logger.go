@@ -9,12 +9,20 @@ import (
 )
 
 func SlogFactory(ctx context.Context) Logger {
-	service := commonCtx.GetStringValue(ctx, commonCtx.ServiceKey)
-
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
 		AddSource: true,
 	}))
 
-	return logger.With(string(commonCtx.ServiceKey), service)
+	if service := commonCtx.GetStringValue(ctx, commonCtx.ServiceKey); service != "" {
+		logger = logger.With(string(commonCtx.ServiceKey), service)
+	}
+	if deviceId := commonCtx.GetStringValue(ctx, commonCtx.DeviceIdKey); deviceId != "" {
+		logger = logger.With(string(commonCtx.DeviceIdKey), deviceId)
+	}
+	if clientVersion := commonCtx.GetStringValue(ctx, commonCtx.ClientVersionKey); clientVersion != "" {
+		logger = logger.With(string(commonCtx.DeviceIdKey), clientVersion)
+	}
+
+	return logger
 }
