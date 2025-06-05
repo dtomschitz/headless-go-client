@@ -32,8 +32,6 @@ type (
 		shutdownOnce sync.Once
 	}
 
-	ServiceOption func(context.Context, *Service) (string, error)
-
 	RequestBuilder func(ctx context.Context, events []*Event) (*http.Request, error)
 )
 
@@ -53,27 +51,6 @@ func defaultRequestBuilder(endpoint string) RequestBuilder {
 		}
 		req.Header.Set("Content-Type", "application/json")
 		return req, nil
-	}
-}
-
-func WithRequestBuilder(builder RequestBuilder) ServiceOption {
-	return func(ctx context.Context, s *Service) (string, error) {
-		if builder == nil {
-			return "", fmt.Errorf("request builder cannot be nil")
-		}
-		s.requestBuilder = builder
-		return "WithRequestBuilder", nil
-	}
-}
-
-func WithLogger(logger logger.Logger) ServiceOption {
-	return func(ctx context.Context, s *Service) (string, error) {
-		if logger == nil {
-			return "", fmt.Errorf("logger cannot be nil")
-		}
-
-		s.logger = logger
-		return "WithLogger", nil
 	}
 }
 
