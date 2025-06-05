@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	commonCtx "github.com/dtomschitz/headless-go-client/context"
 	"github.com/dtomschitz/headless-go-client/logger"
 )
 
@@ -34,6 +35,10 @@ type (
 	ServiceOption func(context.Context, *Service) (string, error)
 
 	RequestBuilder func(ctx context.Context, events []*Event) (*http.Request, error)
+)
+
+const (
+	ServiceName = "EventService"
 )
 
 func defaultRequestBuilder(endpoint string) RequestBuilder {
@@ -73,7 +78,7 @@ func WithLogger(logger logger.Logger) ServiceOption {
 }
 
 func NewService(ctx context.Context, endpoint string, interval time.Duration, opts ...ServiceOption) (*Service, error) {
-	innerCtx, innerCancel := context.WithCancel(ctx)
+	innerCtx, innerCancel := context.WithCancel(context.WithValue(ctx, commonCtx.ServiceKey, ServiceName))
 
 	service := &Service{
 		ctx:       innerCtx,
@@ -87,7 +92,7 @@ func NewService(ctx context.Context, endpoint string, interval time.Duration, op
 	}
 
 	for _, opt := range opts {
-		if optName, err := opt(ctx, service); err != nil {
+		if optName, err := opt(innerCtx, service); err != nil {
 			return nil, fmt.Errorf("failed to apply option %s: %w", optName, err)
 		}
 	}
@@ -156,7 +161,7 @@ func (s *Service) Flush(ctx context.Context) error {
 }
 
 func (s *Service) Name() string {
-	return "EventService"
+	return ServiceName
 }
 
 func (s *Service) Close(ctx context.Context) error {

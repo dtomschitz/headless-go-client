@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	commonCtx "github.com/dtomschitz/headless-go-client/context"
 	"github.com/dtomschitz/headless-go-client/logger"
 )
 
@@ -30,13 +31,20 @@ type (
 	}
 )
 
-// ErrKeyNotFound is returned when a key does not exist.
-var ErrKeyNotFound = errors.New("key not found")
+const (
+	ServiceName = "ConfigService"
+)
 
-// ErrWrongType is returned when the type assertion fails.
-var ErrWrongType = errors.New("wrong type for key")
+var (
+	// ErrKeyNotFound is returned when a key does not exist.
+	ErrKeyNotFound = errors.New("key not found")
+	// ErrWrongType is returned when the type assertion fails.
+	ErrWrongType = errors.New("wrong type for key")
+)
 
 func NewConfigService(ctx context.Context, url string, opts ...ConfigServiceOption) (*ConfigService, error) {
+	innerCtx := context.WithValue(ctx, commonCtx.ServiceKey, ServiceName)
+
 	service := &ConfigService{
 		url:              url,
 		initialPollDelay: 1 * time.Minute,
@@ -47,24 +55,24 @@ func NewConfigService(ctx context.Context, url string, opts ...ConfigServiceOpti
 	}
 
 	for _, opt := range opts {
-		if err := opt(ctx, service); err != nil {
+		if err := opt(innerCtx, service); err != nil {
 			return nil, err
 		}
 	}
 
 	var err error
-	service.current, err = service.storage.Get(ctx)
+	service.current, err = service.storage.Get(innerCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load initial config: %w", err)
 	}
 
 	if service.current == nil {
-		if err := service.Refresh(ctx); err != nil {
+		if err := service.Refresh(innerCtx); err != nil {
 			service.logger.Error("failed to load initial config from remote: %w", err)
 		}
 	}
 
-	return service, service.start(ctx)
+	return service, service.start(innerCtx)
 }
 
 func (cs *ConfigService) start(ctx context.Context) error {

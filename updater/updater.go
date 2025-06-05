@@ -37,6 +37,8 @@ type (
 )
 
 const (
+	ServiceName = "UpdateService"
+
 	UpdateAvailableEvent       event.EventType = "update_available"
 	UpdateDownloadStartedEvent event.EventType = "update_download_started"
 	UpdateDownloadedEvent      event.EventType = "update_downloaded"
@@ -44,8 +46,10 @@ const (
 )
 
 func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
+	innerCtx := context.WithValue(ctx, commonCtx.ServiceKey, ServiceName)
+
 	if currentClientVersion == "" {
-		currentClientVersion = commonCtx.GetStringValue(ctx, commonCtx.ClientVersionKey)
+		currentClientVersion = commonCtx.GetStringValue(innerCtx, commonCtx.ClientVersionKey)
 		if currentClientVersion == "" {
 			return nil, fmt.Errorf("current client version cannot be empty")
 		}
@@ -66,12 +70,12 @@ func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*U
 	}
 
 	for _, opt := range opts {
-		if err := opt(ctx, updater); err != nil {
+		if err := opt(innerCtx, updater); err != nil {
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 
-	return updater, updater.start(ctx)
+	return updater, updater.start(innerCtx)
 }
 
 func (updater *Updater) start(ctx context.Context) error {
@@ -113,7 +117,7 @@ func (updater *Updater) start(ctx context.Context) error {
 }
 
 func (updater *Updater) Name() string {
-	return "Updater"
+	return ServiceName
 }
 
 func (updater *Updater) Close(ctx context.Context) error {
