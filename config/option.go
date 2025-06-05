@@ -44,13 +44,13 @@ func WithHTTPClient(client *http.Client) ConfigServiceOption {
 	}
 }
 
-func WithLogger(logger logger.Logger) ConfigServiceOption {
+func WithLogger(factory logger.Factory) ConfigServiceOption {
 	return func(ctx context.Context, service *ConfigService) error {
-		if logger == nil {
+		if factory == nil {
 			return errors.New("logger is not provided")
 		}
 
-		service.logger = logger
+		service.logger = factory(ctx)
 		return nil
 	}
 }

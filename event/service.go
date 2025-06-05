@@ -82,6 +82,7 @@ func NewService(ctx context.Context, endpoint string, interval time.Duration, op
 		endpoint:       endpoint,
 		interval:       interval,
 		client:         &http.Client{Timeout: 5 * time.Second},
+		logger:         &logger.NoOpLogger{},
 		requestBuilder: defaultRequestBuilder(endpoint),
 	}
 

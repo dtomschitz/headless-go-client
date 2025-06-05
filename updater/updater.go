@@ -45,7 +45,7 @@ const (
 
 func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
 	if currentClientVersion == "" {
-		currentClientVersion = commonCtx.GetStringValue(ctx, commonCtx.ClientVersion)
+		currentClientVersion = commonCtx.GetStringValue(ctx, commonCtx.ClientVersionKey)
 		if currentClientVersion == "" {
 			return nil, fmt.Errorf("current client version cannot be empty")
 		}
@@ -59,7 +59,7 @@ func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*U
 		manifestRequester:   &DefaultManifestRequester{client: httpClient},
 		initialPollDelay:    1 * time.Minute,
 		pollInterval:        1 * time.Hour,
-		logger:              logger.New(ctx, nil),
+		logger:              &logger.NoOpLogger{},
 		events:              &event.NoopEmitter{},
 		updateAvailableChan: make(chan *Manifest),
 		updateAppliedChan:   make(chan *Manifest),

@@ -53,8 +53,8 @@ func WithDataField(key string, value interface{}) EventOption {
 func NewEvent(ctx context.Context, eventType EventType, opts ...EventOption) *Event {
 	event := &Event{
 		Id:            uuid.New().String(),
-		DeviceId:      commonCtx.GetStringValue(ctx, commonCtx.DeviceId),
-		ClientVersion: commonCtx.GetStringValue(ctx, commonCtx.ClientVersion),
+		DeviceId:      commonCtx.GetStringValue(ctx, commonCtx.DeviceIdKey),
+		ClientVersion: commonCtx.GetStringValue(ctx, commonCtx.ClientVersionKey),
 		Type:          eventType,
 		Timestamp:     time.Now(),
 	}

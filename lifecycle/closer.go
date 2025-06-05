@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	commonCtx "github.com/dtomschitz/headless-go-client/context"
 	"github.com/dtomschitz/headless-go-client/logger"
 )
 
@@ -22,14 +23,18 @@ type (
 	}
 )
 
+var ServiceName = "Lifecycle"
+
 func NewLifecycleService(ctx context.Context, opts ...Option) (*LifecycleService, error) {
+	innerCtx := context.WithValue(ctx, commonCtx.ServiceKey, ServiceName)
+
 	service := &LifecycleService{
 		mu:      sync.Mutex{},
 		logger:  &logger.NoOpLogger{},
 		closers: make([]Closer, 0),
 	}
 	for _, opt := range opts {
-		if err := opt(service); err != nil {
+		if err := opt(innerCtx, service); err != nil {
 			return nil, err
 		}
 	}

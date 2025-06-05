@@ -1,19 +1,20 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 
 	"github.com/dtomschitz/headless-go-client/logger"
 )
 
-type Option func(*LifecycleService) error
+type Option func(ctx context.Context, m *LifecycleService) error
 
-func WithLogger(logger logger.Logger) Option {
-	return func(m *LifecycleService) error {
-		if logger == nil {
+func WithLogger(factory logger.Factory) Option {
+	return func(ctx context.Context, m *LifecycleService) error {
+		if factory == nil {
 			return errors.New("logger is not provided")
 		}
-		m.logger = logger
+		m.logger = factory(ctx)
 		return nil
 	}
 }

@@ -7,8 +7,9 @@ type (
 )
 
 const (
-	ClientVersion Key = "client_version"
-	DeviceId      Key = "device_id"
+	ServiceKey       Key = "service"
+	ClientVersionKey Key = "client_version"
+	DeviceIdKey      Key = "device_id"
 )
 
 func GetStringValue(ctx context.Context, key Key) string {
