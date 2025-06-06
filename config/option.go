@@ -11,6 +11,13 @@ import (
 
 type ConfigServiceOption func(context.Context, *ConfigService) error
 
+func WithEnvironmentVariables() ConfigServiceOption {
+	return func(ctx context.Context, service *ConfigService) error {
+		service.extendWithEnvVars = true
+		return nil
+	}
+}
+
 func WithConfigEnvPrefix(prefix string) ConfigServiceOption {
 	return func(ctx context.Context, service *ConfigService) error {
 		if prefix == "" {

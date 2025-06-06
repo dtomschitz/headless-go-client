@@ -22,9 +22,10 @@ type (
 	ConfigService struct {
 		url string
 
-		envKeyPrefix     string
-		initialPollDelay time.Duration
-		pollInterval     time.Duration
+		envKeyPrefix      string
+		extendWithEnvVars bool
+		initialPollDelay  time.Duration
+		pollInterval      time.Duration
 
 		client *http.Client
 		logger logger.Logger
@@ -58,7 +59,7 @@ func NewService(ctx context.Context, url string, opts ...ConfigServiceOption) (*
 	service := &ConfigService{
 		url:              url,
 		initialPollDelay: 1 * time.Minute,
-		pollInterval:     time.Hour * 1,
+		pollInterval:     1 * time.Hour,
 		logger:           &logger.NoOpLogger{},
 		client:           &http.Client{Timeout: 5 * time.Second},
 		storage:          NewInMemoryStorage(),
@@ -157,29 +158,33 @@ func (cs *ConfigService) Refresh(ctx context.Context) error {
 }
 
 func (cs *ConfigService) refresh(ctx context.Context) error {
-	remoteConfig, err := cs.fetchFromRemote(ctx)
+	newConfig, err := cs.fetchFromRemote(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch config: %w", err)
 	}
-	effectiveConfig := cs.extendWithEnvironmentVariables(remoteConfig)
+
+	if cs.extendWithEnvVars {
+		cs.logger.Debug("extending config with environment variables")
+		newConfig = cs.extendWithEnvironmentVariables(newConfig)
+	}
 
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	if cs.current != nil && effectiveConfig.Version == cs.current.Version {
-		cs.logger.Info("config version is up to date", "version", effectiveConfig.Version)
+	if cs.current != nil && newConfig.Version == cs.current.Version {
+		cs.logger.Info("config version is up to date", "version", newConfig.Version)
 		return nil
 	}
 
-	if isConfigContentEqual(effectiveConfig, cs.current) {
+	if isConfigContentEqual(newConfig, cs.current) {
 		cs.logger.Info("config properties have not changed")
 		return nil
 	}
 
-	if err := cs.storage.Save(ctx, effectiveConfig); err != nil {
+	if err := cs.storage.Save(ctx, newConfig); err != nil {
 		return fmt.Errorf("failed to store config: %w", err)
 	}
-	cs.current = effectiveConfig
+	cs.current = newConfig
 
 	return nil
 }
