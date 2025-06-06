@@ -20,6 +20,7 @@ type (
 		Type          EventType              `json:"type"`
 		Message       string                 `json:"message"`
 		Data          map[string]interface{} `json:"data,omitempty"`
+		IsError       bool                   `json:"isError"`
 	}
 
 	EventOption func(*Event)
@@ -47,6 +48,19 @@ func WithDataField(key string, value interface{}) EventOption {
 		}
 		e.Data[key] = value
 	}
+}
+
+// WithError creates an EventOption that sets the error message and data of the event.
+func WithError(err error) EventOption {
+	return func(e *Event) {
+		e.IsError = true
+		e.Message = err.Error()
+	}
+}
+
+// NewEventFromError creates a new Event from an error with the given context and event type.
+func NewEventFromError(ctx context.Context, eventType EventType, err error, opts ...EventOption) *Event {
+	return NewEvent(ctx, eventType, append([]EventOption{WithError(err)}, opts...)...)
 }
 
 // NewEvent creates a new Event with the given context and event type.
