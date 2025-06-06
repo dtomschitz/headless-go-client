@@ -15,7 +15,7 @@ type Option func(context.Context, *Updater) error
 func WithUpdateRequester(requester UpdateRequester) Option {
 	return func(ctx context.Context, updater *Updater) error {
 		if requester == nil {
-			return nil
+			return errors.New("update requester is not provided")
 		}
 		updater.updateRequester = requester
 		return nil
@@ -25,31 +25,31 @@ func WithUpdateRequester(requester UpdateRequester) Option {
 func WithManifestRequester(requester ManifestRequester) Option {
 	return func(ctx context.Context, updater *Updater) error {
 		if requester == nil {
-			return nil
+			return errors.New("manifest requester is not provided")
 		}
 		updater.manifestRequester = requester
 		return nil
 	}
 }
 
-func WithPollInterval(d time.Duration) Option {
+func WithPollInterval(pollInterval time.Duration) Option {
 	return func(ctx context.Context, updater *Updater) error {
-		if d <= 0 {
+		if pollInterval <= 0 {
 			return fmt.Errorf("poll interval must be greater than 0")
 		}
 
-		updater.pollInterval = d
+		updater.pollInterval = pollInterval
 		return nil
 	}
 }
 
-func WithInitialPollDelay(d time.Duration) Option {
+func WithInitialPollDelay(initialPollDelay time.Duration) Option {
 	return func(ctx context.Context, updater *Updater) error {
-		if d < 0 {
+		if initialPollDelay < 0 {
 			return fmt.Errorf("initial poll delay cannot be negative")
 		}
 
-		updater.initialPollDelay = d
+		updater.initialPollDelay = initialPollDelay
 		return nil
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/dtomschitz/headless-go-client/config"
 	"github.com/dtomschitz/headless-go-client/event"
@@ -35,7 +34,7 @@ func main() {
 	}
 	closer.Register(configService)
 
-	eventService, err := event.NewService(ctx, "http://localhost:8080/events", time.Hour*1, event.WithLogger(logger.SlogFactory))
+	eventService, err := event.NewService(ctx, "http://localhost:8080/events", event.WithLogger(logger.SlogFactory))
 	if err != nil {
 		log.Error("failed to create event service", err)
 		return
@@ -53,7 +52,7 @@ func main() {
 	selfUpdater.ListenForUpdateAvailable(ctx, func(ctx context.Context, manifest *updater.Manifest) {
 		err := selfUpdater.ApplyUpdate(ctx, manifest)
 		if err != nil {
-			
+
 			return
 		}
 	})
@@ -62,5 +61,5 @@ func main() {
 	})
 
 	<-ctx.Done()
-	log.Info("client stopped")
+	log.Info("client is going to shutdown")
 }

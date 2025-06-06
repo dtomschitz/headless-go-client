@@ -31,7 +31,7 @@ func (m *MockCloser) Close(ctx context.Context) error {
 func TestManager_RegisterAndClose(t *testing.T) {
 	t.Run("CloseAllWithoutErrors", func(t *testing.T) {
 		//given
-		manager, err := lifecycle.NewLifecycleService(context.Background())
+		manager, err := lifecycle.NewService(context.Background())
 		require.NoError(t, err)
 
 		closer1 := &MockCloser{}
@@ -51,7 +51,7 @@ func TestManager_RegisterAndClose(t *testing.T) {
 
 	t.Run("CloseAllWithErrors", func(t *testing.T) {
 		//given
-		manager, err := lifecycle.NewLifecycleService(context.Background())
+		manager, err := lifecycle.NewService(context.Background())
 		require.NoError(t, err)
 
 		closer1 := &MockCloser{closeErr: errors.New("error closing closer1")}
@@ -72,7 +72,7 @@ func TestManager_RegisterAndClose(t *testing.T) {
 	})
 
 	t.Run("CloseEmptyManager", func(t *testing.T) {
-		manager, err := lifecycle.NewLifecycleService(context.Background())
+		manager, err := lifecycle.NewService(context.Background())
 		require.NoError(t, err)
 
 		err = manager.CloseAll(context.Background())

@@ -15,9 +15,6 @@ import (
 
 type (
 	Service struct {
-		ctx       context.Context
-		cancelCtx context.CancelFunc
-
 		endpoint string
 		logger   logger.Logger
 
@@ -27,9 +24,11 @@ type (
 		interval time.Duration
 		client   *http.Client
 
-		wg           sync.WaitGroup
-		mu           sync.RWMutex
-		shutdownOnce sync.Once
+		internalCtx    context.Context
+		internalCancel context.CancelFunc
+		wg             sync.WaitGroup
+		mu             sync.RWMutex
+		shutdownOnce   sync.Once
 	}
 
 	RequestBuilder func(ctx context.Context, events []*Event) (*http.Request, error)
@@ -54,37 +53,32 @@ func defaultRequestBuilder(endpoint string) RequestBuilder {
 	}
 }
 
-func NewService(ctx context.Context, endpoint string, interval time.Duration, opts ...ServiceOption) (*Service, error) {
-	innerCtx, innerCancel := context.WithCancel(context.WithValue(ctx, commonCtx.ServiceKey, ServiceName))
+func NewService(ctx context.Context, endpoint string, opts ...ServiceOption) (*Service, error) {
+	internalCtx, internalCancel := context.WithCancel(context.WithValue(ctx, commonCtx.ServiceKey, ServiceName))
 
 	service := &Service{
-		ctx:       innerCtx,
-		cancelCtx: innerCancel,
-
+		internalCtx:    internalCtx,
+		internalCancel: internalCancel,
 		endpoint:       endpoint,
-		interval:       interval,
+		interval:       1 * time.Minute,
 		client:         &http.Client{Timeout: 5 * time.Second},
 		logger:         &logger.NoOpLogger{},
 		requestBuilder: defaultRequestBuilder(endpoint),
 	}
 
 	for _, opt := range opts {
-		if optName, err := opt(innerCtx, service); err != nil {
+		if optName, err := opt(internalCtx, service); err != nil {
+			internalCancel()
 			return nil, fmt.Errorf("failed to apply option %s: %w", optName, err)
 		}
 	}
 
-	return service, nil
+	return service, service.start(internalCtx)
 }
 
-func (s *Service) RegisterProducer(e Producer) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.producers = append(s.producers, e)
-}
-
-func (s *Service) Start() {
+func (s *Service) start(ctx context.Context) error {
 	s.wg.Add(1)
+
 	go func() {
 		ticker := time.NewTicker(s.interval)
 		defer ticker.Stop()
@@ -92,16 +86,23 @@ func (s *Service) Start() {
 
 		for {
 			select {
-			case <-s.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				err := s.Flush(s.ctx)
-				if err != nil {
-					return
+				if err := s.Flush(ctx); err != nil {
+					s.logger.Error("failed to flush events", "error", err)
 				}
 			}
 		}
 	}()
+
+	return nil
+}
+
+func (s *Service) RegisterProducer(e Producer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.producers = append(s.producers, e)
 }
 
 func (s *Service) Flush(ctx context.Context) error {
@@ -143,8 +144,8 @@ func (s *Service) Name() string {
 
 func (s *Service) Close(ctx context.Context) error {
 	s.shutdownOnce.Do(func() {
-		if s.ctx != nil && s.cancelCtx != nil {
-			s.cancelCtx()
+		if s.internalCancel != nil {
+			s.internalCancel()
 		}
 	})
 
@@ -165,10 +166,7 @@ func (s *Service) Close(ctx context.Context) error {
 		close(done)
 	}()
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-done:
-		return nil
-	}
+	<-done
+
+	return nil
 }

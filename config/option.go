@@ -11,24 +11,24 @@ import (
 
 type ConfigServiceOption func(context.Context, *ConfigService) error
 
-func WithPollInterval(d time.Duration) ConfigServiceOption {
+func WithPollInterval(pollInterval time.Duration) ConfigServiceOption {
 	return func(ctx context.Context, service *ConfigService) error {
-		if d <= 0 {
+		if pollInterval <= 0 {
 			return errors.New("poll interval must be greater than 0")
 		}
 
-		service.pollInterval = d
+		service.pollInterval = pollInterval
 		return nil
 	}
 }
 
-func WithInitialPollDelay(d time.Duration) ConfigServiceOption {
+func WithInitialPollDelay(initialPollDelay time.Duration) ConfigServiceOption {
 	return func(ctx context.Context, service *ConfigService) error {
-		if d < 0 {
+		if initialPollDelay < 0 {
 			return errors.New("initial poll delay cannot be negative")
 		}
 
-		service.initialPollDelay = d
+		service.initialPollDelay = initialPollDelay
 		return nil
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	commonCtx "github.com/dtomschitz/headless-go-client/context"
@@ -17,20 +18,23 @@ import (
 
 type (
 	Updater struct {
-		currentVersion string
-		manifestURL    string
-
-		logger logger.Logger
-		events event.Emitter
-
-		updateRequester   UpdateRequester
-		manifestRequester ManifestRequester
-
+		currentVersion   string
+		manifestURL      string
 		initialPollDelay time.Duration
 		pollInterval     time.Duration
 
+		logger            logger.Logger
+		events            event.Emitter
+		updateRequester   UpdateRequester
+		manifestRequester ManifestRequester
+
 		updateAvailableChan chan *Manifest
 		updateAppliedChan   chan *Manifest
+
+		internalCtx    context.Context
+		internalCancel context.CancelFunc
+		wg             sync.WaitGroup
+		shutdownOnce   sync.Once
 	}
 
 	UpdateEventFunc func(ctx context.Context, mainfest *Manifest)
@@ -46,11 +50,13 @@ const (
 )
 
 func NewService(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
-	innerCtx := context.WithValue(ctx, commonCtx.ServiceKey, ServiceName)
+	internalCtx, internalCancel := context.WithCancel(ctx)
+	internalCtx = context.WithValue(internalCtx, commonCtx.ServiceKey, ServiceName)
 
 	if currentClientVersion == "" {
-		currentClientVersion = commonCtx.GetStringValue(innerCtx, commonCtx.ClientVersionKey)
+		currentClientVersion = commonCtx.GetStringValue(internalCtx, commonCtx.ClientVersionKey)
 		if currentClientVersion == "" {
+			internalCancel()
 			return nil, fmt.Errorf("current client version cannot be empty")
 		}
 	}
@@ -67,31 +73,37 @@ func NewService(ctx context.Context, currentClientVersion string, opts ...Option
 		events:              &event.NoopEmitter{},
 		updateAvailableChan: make(chan *Manifest),
 		updateAppliedChan:   make(chan *Manifest),
+		internalCtx:         internalCtx,
+		internalCancel:      internalCancel,
 	}
 
 	for _, opt := range opts {
-		if err := opt(innerCtx, updater); err != nil {
+		if err := opt(internalCtx, updater); err != nil {
+			internalCancel()
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 
-	return updater, updater.start(innerCtx)
+	updater.start(internalCtx)
+	updater.logger.Info("started service successfully with poll interval of %s", updater.pollInterval)
+
+	return updater, nil
 }
 
-func (updater *Updater) start(ctx context.Context) error {
-	if updater.updateRequester == nil {
-		return fmt.Errorf("updater requester cannot be nil")
-	}
+func (updater *Updater) start(ctx context.Context) {
+	updater.wg.Add(1)
 
 	go func() {
+		defer updater.wg.Done()
+
 		if updater.initialPollDelay > 0 {
-			updater.logger.Info("waiting for initial poll delay of %s before starting SelfUpdater", updater.initialPollDelay)
+			updater.logger.Info("waiting for initial poll delay of %s before starting service", updater.initialPollDelay)
 			select {
 			case <-ctx.Done():
-				updater.logger.Warn("stopped SelfUpdater because context was cancelled")
+				updater.logger.Warn("stopped service because context was cancelled")
 				return
 			case <-time.After(updater.initialPollDelay):
-				updater.logger.Info("initial poll delay completed, starting SelfUpdater")
+				updater.logger.Info("initial poll delay completed, starting service")
 			}
 		}
 
@@ -101,7 +113,7 @@ func (updater *Updater) start(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				updater.logger.Warn("stopped SelfUpdater because context was cancelled")
+				updater.logger.Warn("stopped service because context was cancelled")
 				return
 			case <-ticker.C:
 				if err := updater.TriggerUpdateCheck(ctx); err != nil {
@@ -111,9 +123,6 @@ func (updater *Updater) start(ctx context.Context) error {
 			}
 		}
 	}()
-
-	updater.logger.Info("self updater started successfully with poll interval of %s", updater.pollInterval)
-	return nil
 }
 
 func (updater *Updater) Name() string {
@@ -121,6 +130,21 @@ func (updater *Updater) Name() string {
 }
 
 func (updater *Updater) Close(ctx context.Context) error {
+	updater.shutdownOnce.Do(func() {
+		if updater.internalCancel != nil {
+			updater.internalCancel()
+		}
+		close(updater.updateAvailableChan)
+		close(updater.updateAppliedChan)
+	})
+
+	done := make(chan struct{})
+	go func() {
+		updater.wg.Wait()
+		close(done)
+	}()
+
+	<-done
 	return nil
 }
 

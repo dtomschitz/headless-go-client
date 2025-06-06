@@ -31,6 +31,8 @@ type (
 
 		internalCtx    context.Context
 		internalCancel context.CancelFunc
+		wg             sync.WaitGroup
+		shutdownOnce   sync.Once
 	}
 )
 
@@ -79,19 +81,25 @@ func NewService(ctx context.Context, url string, opts ...ConfigServiceOption) (*
 		}
 	}
 
-	return service, service.start(internalCtx)
+	service.start(internalCtx)
+	service.logger.Info("started service successfully with poll interval of %s", service.pollInterval)
+
+	return service, nil
 }
 
-func (cs *ConfigService) start(ctx context.Context) error {
+func (cs *ConfigService) start(ctx context.Context) {
+	cs.wg.Add(1)
 	go func() {
+		defer cs.wg.Done()
+
 		if cs.initialPollDelay > 0 {
-			cs.logger.Info("waiting for initial poll delay of %s before starting ConfigService", cs.initialPollDelay)
+			cs.logger.Info("waiting for initial poll delay of %s before starting service", cs.initialPollDelay)
 			select {
 			case <-ctx.Done():
-				cs.logger.Warn("stopped ConfigService because context was cancelled")
+				cs.logger.Warn("stopped service because context was cancelled")
 				return
 			case <-time.After(cs.initialPollDelay):
-				cs.logger.Info("initial poll delay completed, starting ConfigService")
+				cs.logger.Info("initial poll delay completed, starting service")
 			}
 		}
 
@@ -110,10 +118,6 @@ func (cs *ConfigService) start(ctx context.Context) error {
 			}
 		}
 	}()
-
-	cs.logger.Info("ConfigService started successfully with poll interval of %s", cs.pollInterval)
-
-	return nil
 }
 
 func (cs *ConfigService) Name() string {
@@ -121,7 +125,19 @@ func (cs *ConfigService) Name() string {
 }
 
 func (cs *ConfigService) Close(ctx context.Context) error {
-	cs.internalCancel()
+	cs.shutdownOnce.Do(func() {
+		if cs.internalCancel != nil {
+			cs.internalCancel()
+		}
+	})
+
+	done := make(chan struct{})
+	go func() {
+		cs.wg.Wait()
+		close(done)
+	}()
+
+	<-done
 	return nil
 }
 
