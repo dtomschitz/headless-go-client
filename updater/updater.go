@@ -45,7 +45,7 @@ const (
 	UpdateAppliedEvent         event.EventType = "update_applied"
 )
 
-func Start(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
+func NewService(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
 	innerCtx := context.WithValue(ctx, commonCtx.ServiceKey, ServiceName)
 
 	if currentClientVersion == "" {

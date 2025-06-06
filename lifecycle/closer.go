@@ -25,7 +25,7 @@ type (
 
 var ServiceName = "Lifecycle"
 
-func NewLifecycleService(ctx context.Context, opts ...Option) (*LifecycleService, error) {
+func NewService(ctx context.Context, opts ...Option) (*LifecycleService, error) {
 	innerCtx := context.WithValue(ctx, commonCtx.ServiceKey, ServiceName)
 
 	service := &LifecycleService{

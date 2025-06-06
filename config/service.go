@@ -42,7 +42,7 @@ var (
 	ErrWrongType = errors.New("wrong type for key")
 )
 
-func NewConfigService(ctx context.Context, url string, opts ...ConfigServiceOption) (*ConfigService, error) {
+func NewService(ctx context.Context, url string, opts ...ConfigServiceOption) (*ConfigService, error) {
 	innerCtx := context.WithValue(ctx, commonCtx.ServiceKey, ServiceName)
 
 	service := &ConfigService{

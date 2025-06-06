@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/dtomschitz/headless-go-client/config"
@@ -13,29 +15,37 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	closer, err := lifecycle.NewLifecycleService(ctx, lifecycle.WithLogger(logger.SlogFactory))
+	log := logger.SlogFactory(ctx)
+	log.Info("starting client")
+
+	closer, err := lifecycle.NewService(ctx, lifecycle.WithLogger(logger.SlogFactory))
 	if err != nil {
-		log.Fatalf("Failed to create lifecycle service: %v", err)
+		log.Error("failed to create lifecycle service", err)
+		return
 	}
 	defer closer.CloseAll(ctx)
 
-	configService, err := config.NewConfigService(ctx, "http://localhost:8080/config", config.WithLogger(logger.SlogFactory))
+	configService, err := config.NewService(ctx, "http://localhost:8080/config", config.WithLogger(logger.SlogFactory))
 	if err != nil {
-		log.Fatalf("Failed to create config service: %v", err)
+		log.Error("failed to create config service", err)
+		return
 	}
 	closer.Register(configService)
 
 	eventService, err := event.NewService(ctx, "http://localhost:8080/events", time.Hour*1, event.WithLogger(logger.SlogFactory))
 	if err != nil {
-		log.Fatalf("Failed to create event service: %v", err)
+		log.Error("failed to create event service", err)
+		return
 	}
 	closer.Register(eventService)
 
-	selfUpdater, err := updater.Start(ctx, "dev", updater.WithLogger(logger.SlogFactory))
+	selfUpdater, err := updater.NewService(ctx, "dev", updater.WithLogger(logger.SlogFactory))
 	if err != nil {
-		log.Fatalf("Failed to run self updater: %v", err)
+		log.Error("failed to create update service", err)
+		return
 	}
 	eventService.RegisterProducer(selfUpdater)
 	closer.Register(selfUpdater)
@@ -43,11 +53,14 @@ func main() {
 	selfUpdater.ListenForUpdateAvailable(ctx, func(ctx context.Context, manifest *updater.Manifest) {
 		err := selfUpdater.ApplyUpdate(ctx, manifest)
 		if err != nil {
-
+			
 			return
 		}
 	})
 	selfUpdater.ListenForUpdateApplied(ctx, func(ctx context.Context, manifest *updater.Manifest) {
 
 	})
+
+	<-ctx.Done()
+	log.Info("client stopped")
 }
