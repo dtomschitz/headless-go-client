@@ -28,6 +28,9 @@ type (
 		current *Config
 		storage Storage
 		mu      sync.RWMutex
+
+		internalCtx    context.Context
+		internalCancel context.CancelFunc
 	}
 )
 
@@ -43,7 +46,8 @@ var (
 )
 
 func NewService(ctx context.Context, url string, opts ...ConfigServiceOption) (*ConfigService, error) {
-	innerCtx := context.WithValue(ctx, commonCtx.ServiceKey, ServiceName)
+	internalCtx, internalCancel := context.WithCancel(ctx)
+	internalCtx = context.WithValue(internalCtx, commonCtx.ServiceKey, ServiceName)
 
 	service := &ConfigService{
 		url:              url,
@@ -52,27 +56,30 @@ func NewService(ctx context.Context, url string, opts ...ConfigServiceOption) (*
 		logger:           &logger.NoOpLogger{},
 		client:           &http.Client{Timeout: 5 * time.Second},
 		storage:          NewInMemoryStorage(),
+		internalCtx:      internalCtx,
+		internalCancel:   internalCancel,
 	}
 
 	for _, opt := range opts {
-		if err := opt(innerCtx, service); err != nil {
+		if err := opt(internalCtx, service); err != nil {
+			internalCancel()
 			return nil, err
 		}
 	}
 
 	var err error
-	service.current, err = service.storage.Get(innerCtx)
+	service.current, err = service.storage.Get(internalCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load initial config: %w", err)
 	}
 
 	if service.current == nil {
-		if err := service.Refresh(innerCtx); err != nil {
+		if err := service.Refresh(internalCtx); err != nil {
 			service.logger.Error("failed to load initial config from remote: %w", err)
 		}
 	}
 
-	return service, service.start(innerCtx)
+	return service, service.start(internalCtx)
 }
 
 func (cs *ConfigService) start(ctx context.Context) error {
@@ -114,6 +121,7 @@ func (cs *ConfigService) Name() string {
 }
 
 func (cs *ConfigService) Close(ctx context.Context) error {
+	cs.internalCancel()
 	return nil
 }
 
