@@ -47,7 +47,7 @@ func (m *LifecycleService) Register(c Closer) {
 	defer m.mu.Unlock()
 	m.closers = append([]Closer{c}, m.closers...)
 
-	m.logger.Info("successfully registed closer for closer %s", c.Name())
+	m.logger.Info("successfully registered closer", "name", c.Name())
 }
 
 func (m *LifecycleService) CloseAll(ctx context.Context) error {
@@ -63,7 +63,7 @@ func (m *LifecycleService) CloseAll(ctx context.Context) error {
 
 	err := errors.Join(errs...)
 	if err != nil {
-		m.logger.Error("failed to close all closers: %v", err)
+		m.logger.Error("failed to close all closers", "error", err)
 		return err
 	}
 

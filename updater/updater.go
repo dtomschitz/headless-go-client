@@ -85,7 +85,7 @@ func NewService(ctx context.Context, currentClientVersion string, opts ...Option
 	}
 
 	updater.start(internalCtx)
-	updater.logger.Info("started service successfully with poll interval of %s", updater.pollInterval)
+	updater.logger.Info("started service successfully", "pollInterval", updater.pollInterval)
 
 	return updater, nil
 }
@@ -97,7 +97,8 @@ func (updater *Updater) start(ctx context.Context) {
 		defer updater.wg.Done()
 
 		if updater.initialPollDelay > 0 {
-			updater.logger.Info("waiting for initial poll delay of %s before starting service", updater.initialPollDelay)
+			updater.logger.Info("waiting for initial poll delay before starting service", "initialPollDelay", updater.initialPollDelay)
+
 			select {
 			case <-ctx.Done():
 				updater.logger.Warn("stopped service because context was cancelled")
@@ -117,7 +118,7 @@ func (updater *Updater) start(ctx context.Context) {
 				return
 			case <-ticker.C:
 				if err := updater.TriggerUpdateCheck(ctx); err != nil {
-					updater.logger.Error("failed to trigger update check: %v", err)
+					updater.logger.Error("failed to trigger update check", "error", err)
 					return
 				}
 			}
@@ -209,7 +210,7 @@ func (updater *Updater) TriggerUpdateCheck(ctx context.Context) error {
 func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) error {
 	eventOpts := event.WithDataField("manifest", manifest)
 
-	updater.logger.Info("going to apply update with version %s", manifest.Version)
+	updater.logger.Info("going to apply update", "version", manifest.Version)
 	updater.events.Push(event.NewEvent(ctx, UpdateDownloadStartedEvent, eventOpts))
 
 	binary, err := updater.updateRequester.Fetch(ctx, manifest)
@@ -219,7 +220,7 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) err
 	defer binary.Close()
 
 	updater.events.Push(event.NewEvent(ctx, UpdateDownloadedEvent, eventOpts))
-	updater.logger.Debug("update with version %s fetched successfully", manifest.Version)
+	updater.logger.Debug("update fetched successfully", "version", manifest.Version)
 
 	execPath, err := os.Executable()
 	if err != nil {
@@ -242,7 +243,7 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) err
 	if manifest.SHA256 != "" {
 		actualHash := hex.EncodeToString(hasher.Sum(nil))
 		if actualHash != manifest.SHA256 {
-			return fmt.Errorf("updated stopped because checksum mismatch: expected %s, got %s", manifest.SHA256, actualHash)
+			return fmt.Errorf("updated stopped because checksum mismatch", "expected", manifest.SHA256, "actual", actualHash)
 		}
 		updater.logger.Debug("going to proceed with update because checksum matches")
 	}
