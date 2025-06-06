@@ -73,10 +73,13 @@ func NewService(ctx context.Context, endpoint string, opts ...ServiceOption) (*S
 		}
 	}
 
-	return service, service.start(internalCtx)
+	service.start(internalCtx)
+	service.logger.Info("started service successfully", "pushInterval", service.interval)
+
+	return service, nil
 }
 
-func (s *Service) start(ctx context.Context) error {
+func (s *Service) start(ctx context.Context) {
 	s.wg.Add(1)
 
 	go func() {
@@ -95,8 +98,6 @@ func (s *Service) start(ctx context.Context) error {
 			}
 		}
 	}()
-
-	return nil
 }
 
 func (s *Service) RegisterProducer(e Producer) {

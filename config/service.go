@@ -82,7 +82,7 @@ func NewService(ctx context.Context, url string, opts ...ConfigServiceOption) (*
 	}
 
 	service.start(internalCtx)
-	service.logger.Info("started service successfully with poll interval of %s", service.pollInterval)
+	service.logger.Info("started service successfully", "pollInterval", service.pollInterval)
 
 	return service, nil
 }
@@ -93,7 +93,7 @@ func (cs *ConfigService) start(ctx context.Context) {
 		defer cs.wg.Done()
 
 		if cs.initialPollDelay > 0 {
-			cs.logger.Info("waiting for initial poll delay of %s before starting service", cs.initialPollDelay)
+			cs.logger.Info("waiting for initial poll delay before starting service", "initialPollDelay", cs.initialPollDelay)
 			select {
 			case <-ctx.Done():
 				cs.logger.Warn("stopped service because context was cancelled")
@@ -109,7 +109,7 @@ func (cs *ConfigService) start(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				cs.logger.Info("")
+				cs.logger.Warn("stopped service because context was cancelled")
 				return
 			case <-ticker.C:
 				if err := cs.Refresh(ctx); err != nil {
@@ -139,6 +139,26 @@ func (cs *ConfigService) Close(ctx context.Context) error {
 
 	<-done
 	return nil
+}
+
+func (cs *ConfigService) Current() *Config {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	if cs.current == nil {
+		return nil
+	}
+
+	copiedConfig := &Config{
+		Version:    cs.current.Version,
+		Properties: make(map[string]interface{}),
+	}
+
+	for key, value := range cs.current.Properties {
+		copiedConfig.Properties[key] = value
+	}
+
+	return copiedConfig
 }
 
 func (cs *ConfigService) Refresh(ctx context.Context) error {
