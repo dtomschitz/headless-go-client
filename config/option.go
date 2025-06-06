@@ -11,6 +11,17 @@ import (
 
 type ConfigServiceOption func(context.Context, *ConfigService) error
 
+func WithConfigEnvPrefix(prefix string) ConfigServiceOption {
+	return func(ctx context.Context, service *ConfigService) error {
+		if prefix == "" {
+			return errors.New("env key prefix cannot be empty")
+		}
+
+		service.envKeyPrefix = prefix
+		return nil
+	}
+}
+
 func WithPollInterval(pollInterval time.Duration) ConfigServiceOption {
 	return func(ctx context.Context, service *ConfigService) error {
 		if pollInterval <= 0 {

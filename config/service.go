@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
+	"os"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	commonCtx "github.com/dtomschitz/headless-go-client/context"
 	"github.com/dtomschitz/headless-go-client/logger"
@@ -19,6 +22,7 @@ type (
 	ConfigService struct {
 		url string
 
+		envKeyPrefix     string
 		initialPollDelay time.Duration
 		pollInterval     time.Duration
 
@@ -145,152 +149,120 @@ func (cs *ConfigService) Current() *Config {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 
-	if cs.current == nil {
-		return nil
-	}
-
-	copiedConfig := &Config{
-		Version:    cs.current.Version,
-		Properties: make(map[string]interface{}),
-	}
-
-	for key, value := range cs.current.Properties {
-		copiedConfig.Properties[key] = value
-	}
-
-	return copiedConfig
+	return deepCopyConfig(cs.current)
 }
 
 func (cs *ConfigService) Refresh(ctx context.Context) error {
-	resp, err := cs.client.Get(cs.url)
+	return cs.refresh(ctx)
+}
+
+func (cs *ConfigService) refresh(ctx context.Context) error {
+	remoteConfig, err := cs.fetchFromRemote(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch config: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var config *Config
-	if err := json.Unmarshal(body, &config); err != nil {
-		return fmt.Errorf("invalid config JSON: %w", err)
-	}
+	effectiveConfig := cs.extendWithEnvironmentVariables(remoteConfig)
 
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	if config.Version == cs.current.Version {
-		cs.logger.Debug("config version %d is up to date", config.Version)
+	if cs.current != nil && effectiveConfig.Version == cs.current.Version {
+		cs.logger.Info("config version is up to date", "version", effectiveConfig.Version)
 		return nil
 	}
 
-	if err := cs.storage.Save(ctx, config); err != nil {
+	if isConfigContentEqual(effectiveConfig, cs.current) {
+		cs.logger.Info("config properties have not changed")
+		return nil
+	}
+
+	if err := cs.storage.Save(ctx, effectiveConfig); err != nil {
 		return fmt.Errorf("failed to store config: %w", err)
 	}
-	cs.current = config
+	cs.current = effectiveConfig
 
 	return nil
 }
 
-func (c *Config) GetString(key string) (string, error) {
-	val, ok := c.Properties[key]
-	if !ok {
-		return "", fmt.Errorf("%w: %s", ErrKeyNotFound, key)
+func (cs *ConfigService) fetchFromRemote(ctx context.Context) (*Config, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cs.url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	switch v := val.(type) {
-	case string:
-		return v, nil
-	case []byte:
-		return string(v), nil
-	case fmt.Stringer:
-		return v.String(), nil
-	default:
-		return "", fmt.Errorf("%w: expected string but got %T", ErrWrongType, val)
+	resp, err := cs.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch config: %w", err)
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var config *Config
+	if err := json.Unmarshal(body, &config); err != nil {
+		return nil, fmt.Errorf("invalid config JSON: %w", err)
+	}
+
+	return config, nil
 }
 
-func (c *Config) GetInt(key string) (int, error) {
-	val, ok := c.Properties[key]
-	if !ok {
-		return 0, fmt.Errorf("%w: %s", ErrKeyNotFound, key)
+func (cs *ConfigService) extendWithEnvironmentVariables(baseConfig *Config) *Config {
+	if baseConfig == nil {
+		baseConfig = &Config{Properties: make(map[string]interface{})}
+	} else {
+		baseConfig = deepCopyConfig(baseConfig)
 	}
 
-	switch v := val.(type) {
-	case int:
-		return v, nil
-	case int8:
-		return int(v), nil
-	case int16:
-		return int(v), nil
-	case int32:
-		return int(v), nil
-	case int64:
-		return int(v), nil
-	case float32:
-		return int(v), nil
-	case float64:
-		return int(v), nil
-	case string:
-		i, err := strconv.Atoi(v)
-		if err != nil {
-			return 0, fmt.Errorf("cannot convert string to int: %w", err)
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, cs.envKeyPrefix) {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) != 2 {
+				cs.logger.Debug("invalid environment variable", "env", env)
+				continue
+			}
+
+			envKey := parts[0]
+			envValue := parts[1]
+
+			configKey := strings.TrimPrefix(envKey, cs.envKeyPrefix)
+			configKey = strings.ToLower(configKey)
+
+			if _, ok := baseConfig.Properties[configKey]; ok {
+				cs.logger.Debug("environment variable already applied", "key", configKey, "value", envKey)
+				continue
+			}
+
+			baseConfig.Properties[configKey] = envValue
+			cs.logger.Debug("applied environment variable override", "key", configKey, "value", envKey)
 		}
-		return i, nil
-	default:
-		return 0, fmt.Errorf("%w: expected int but got %T", ErrWrongType, val)
 	}
+
+	return baseConfig
 }
 
-func (c *Config) GetBool(key string) (bool, error) {
-	val, ok := c.Properties[key]
-	if !ok {
-		return false, fmt.Errorf("%w: %s", ErrKeyNotFound, key)
-	}
-
-	switch v := val.(type) {
-	case bool:
-		return v, nil
-	case string:
-		switch v {
-		case "true", "1", "yes":
-			return true, nil
-		case "false", "0", "no":
-			return false, nil
-		default:
-			return false, fmt.Errorf("cannot convert string to bool: %s", v)
-		}
-	default:
-		return false, fmt.Errorf("%w: expected bool but got %T", ErrWrongType, val)
-	}
+func isConfigContentEqual(a, b *Config) bool {
+	return cmp.Equal(a.Properties, b.Properties)
 }
 
-func (c *Config) GetFloat64(key string) (float64, error) {
-	val, ok := c.Properties[key]
-	if !ok {
-		return 0, fmt.Errorf("%w: %s", ErrKeyNotFound, key)
+func deepCopyConfig(config *Config) *Config {
+	if config == nil {
+		return nil
 	}
 
-	switch v := val.(type) {
-	case float64:
-		return v, nil
-	case float32:
-		return float64(v), nil
-	case int:
-		return float64(v), nil
-	case string:
-		f, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			return 0, fmt.Errorf("cannot convert string to float64: %w", err)
-		}
-		return f, nil
-	default:
-		return 0, fmt.Errorf("%w: expected float64 but got %T", ErrWrongType, val)
+	copied := &Config{
+		Version:    config.Version,
+		Properties: make(map[string]interface{}, len(config.Properties)),
 	}
+	for k, v := range config.Properties {
+		copied.Properties[k] = v
+	}
+
+	return copied
 }
