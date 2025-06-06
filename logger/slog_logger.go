@@ -10,8 +10,7 @@ import (
 
 func SlogFactory(ctx context.Context) Logger {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level:     slog.LevelDebug,
-		AddSource: true,
+		Level: slog.LevelDebug,
 	}))
 
 	if service := commonCtx.GetStringValue(ctx, commonCtx.ServiceKey); service != "" {
