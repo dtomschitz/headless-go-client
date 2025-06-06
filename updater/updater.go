@@ -44,6 +44,8 @@ const (
 	ServiceName = "UpdateService"
 
 	UpdateAvailableEvent       event.EventType = "update_available"
+	NoUpdateAvailableEvent     event.EventType = "no_update_available"
+	UpdateStartedEvent         event.EventType = "update_started"
 	UpdateDownloadStartedEvent event.EventType = "update_download_started"
 	UpdateDownloadedEvent      event.EventType = "update_downloaded"
 	UpdateAppliedEvent         event.EventType = "update_applied"
@@ -71,8 +73,8 @@ func NewService(ctx context.Context, currentClientVersion string, opts ...Option
 		pollInterval:        1 * time.Hour,
 		logger:              &logger.NoOpLogger{},
 		events:              &event.NoopEmitter{},
-		updateAvailableChan: make(chan *Manifest),
-		updateAppliedChan:   make(chan *Manifest),
+		updateAvailableChan: make(chan *Manifest, 1),
+		updateAppliedChan:   make(chan *Manifest, 1),
 		internalCtx:         internalCtx,
 		internalCancel:      internalCancel,
 	}
@@ -154,29 +156,11 @@ func (updater *Updater) PollEvents() []*event.Event {
 }
 
 func (updater *Updater) ListenForUpdateAvailable(ctx context.Context, fn UpdateEventFunc) {
-	updater.eventListener(ctx, updater.updateAvailableChan, func(ctx context.Context, manifest *Manifest) {
-		if manifest == nil {
-			return
-		}
-
-		updater.events.Push(event.NewEvent(ctx, UpdateAvailableEvent, event.WithDataField("manifest", manifest)))
-		updater.logger.Info("new update is available: %s", manifest.Version)
-
-		fn(ctx, manifest)
-	})
+	updater.eventListener(ctx, updater.updateAvailableChan, fn)
 }
 
 func (updater *Updater) ListenForUpdateApplied(ctx context.Context, fn UpdateEventFunc) {
-	updater.eventListener(ctx, updater.updateAppliedChan, func(ctx context.Context, manifest *Manifest) {
-		if manifest == nil {
-			return
-		}
-
-		updater.events.Push(event.NewEvent(ctx, UpdateAppliedEvent, event.WithDataField("manifest", manifest)))
-		updater.logger.Info("new update has been applied: %s", manifest.Version)
-
-		fn(ctx, manifest)
-	})
+	updater.eventListener(ctx, updater.updateAppliedChan, fn)
 }
 
 func (updater *Updater) eventListener(ctx context.Context, updateChan chan *Manifest, fn UpdateEventFunc) {
@@ -186,7 +170,9 @@ func (updater *Updater) eventListener(ctx context.Context, updateChan chan *Mani
 			case <-ctx.Done():
 				return
 			case manifest := <-updateChan:
-				fn(ctx, manifest)
+				if manifest != nil {
+					fn(ctx, manifest)
+				}
 			}
 		}
 	}()
@@ -195,23 +181,41 @@ func (updater *Updater) eventListener(ctx context.Context, updateChan chan *Mani
 func (updater *Updater) TriggerUpdateCheck(ctx context.Context) error {
 	manifest, isAvailable, err := updater.checkIfUpdateIsAvailable(ctx)
 	if err != nil {
+		updater.events.Push(event.NewEventFromError(ctx, UpdateAvailableEvent, err))
 		return fmt.Errorf("failed to check for updates: %w", err)
 	}
 
 	if !isAvailable {
+		updater.events.Push(event.NewEvent(ctx, NoUpdateAvailableEvent))
 		updater.logger.Info("no update is available")
 		return nil
 	}
 
+	updater.events.Push(event.NewEvent(ctx, UpdateAvailableEvent, event.WithDataField("manifest", manifest)))
 	updater.updateAvailableChan <- manifest
+
 	return nil
 }
 
 func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) error {
 	eventOpts := event.WithDataField("manifest", manifest)
+	updater.events.Push(event.NewEvent(ctx, UpdateStartedEvent, eventOpts))
 
+	if err := updater.applyUpdate(ctx, manifest); err != nil {
+		err = fmt.Errorf("failed to apply update: %w", err)
+		updater.events.Push(event.NewEventFromError(ctx, UpdateAppliedEvent, err, eventOpts))
+		return err
+	}
+
+	updater.events.Push(event.NewEvent(ctx, UpdateAppliedEvent, eventOpts))
+	updater.logger.Info("new update has been applied: %s", manifest.Version)
+
+	return nil
+}
+
+func (updater *Updater) applyUpdate(ctx context.Context, manifest *Manifest) error {
 	updater.logger.Info("going to apply update", "version", manifest.Version)
-	updater.events.Push(event.NewEvent(ctx, UpdateDownloadStartedEvent, eventOpts))
+	updater.events.Push(event.NewEvent(ctx, UpdateDownloadStartedEvent))
 
 	binary, err := updater.updateRequester.Fetch(ctx, manifest)
 	if err != nil {
@@ -219,7 +223,7 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) err
 	}
 	defer binary.Close()
 
-	updater.events.Push(event.NewEvent(ctx, UpdateDownloadedEvent, eventOpts))
+	updater.events.Push(event.NewEvent(ctx, UpdateDownloadedEvent))
 	updater.logger.Debug("update fetched successfully", "version", manifest.Version)
 
 	execPath, err := os.Executable()
@@ -243,7 +247,7 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) err
 	if manifest.SHA256 != "" {
 		actualHash := hex.EncodeToString(hasher.Sum(nil))
 		if actualHash != manifest.SHA256 {
-			return fmt.Errorf("updated stopped because checksum mismatch", "expected", manifest.SHA256, "actual", actualHash)
+			return fmt.Errorf("updated stopped because checksum mismatch: expected %s, actual %s", manifest.SHA256, actualHash)
 		}
 		updater.logger.Debug("going to proceed with update because checksum matches")
 	}
