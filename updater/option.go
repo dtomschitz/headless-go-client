@@ -54,13 +54,13 @@ func WithInitialPollDelay(d time.Duration) Option {
 	}
 }
 
-func WithLogger(l logger.Logger) Option {
+func WithLogger(factory logger.Factory) Option {
 	return func(ctx context.Context, updater *Updater) error {
-		if l == nil {
+		if factory == nil {
 			return errors.New("logger is not provided")
 		}
 
-		updater.logger = l
+		updater.logger = factory(ctx)
 		return nil
 	}
 }

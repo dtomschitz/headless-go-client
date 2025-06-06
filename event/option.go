@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dtomschitz/headless-go-client/logger"
@@ -19,13 +20,13 @@ func WithRequestBuilder(builder RequestBuilder) ServiceOption {
 	}
 }
 
-func WithLogger(logger logger.Logger) ServiceOption {
+func WithLogger(factory logger.Factory) ServiceOption {
 	return func(ctx context.Context, s *Service) (string, error) {
-		if logger == nil {
-			return "", fmt.Errorf("logger cannot be nil")
+		if factory == nil {
+			return "WitLogger", errors.New("logger is not provided")
 		}
 
-		s.logger = logger
-		return "WithLogger", nil
+		s.logger = factory(ctx)
+		return "WitLogger", nil
 	}
 }
