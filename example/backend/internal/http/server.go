@@ -16,8 +16,8 @@ func StartServer(configService *internal.ConfigService) error {
 		configs := api.Group("/configs")
 		{
 			configs.POST("", configHandler.CreateConfig)
-			configs.GET("/:version", configHandler.GetConfigByVersion)
-			configs.GET("/latest", configHandler.GetLatestConfig)
+			configs.GET("/:version/properties", configHandler.GetConfigByVersion)
+			configs.GET("/manifest", configHandler.GetLatestManifest)
 		}
 	}
 

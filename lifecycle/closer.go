@@ -33,6 +33,7 @@ func NewService(ctx context.Context, opts ...Option) (*LifecycleService, error) 
 		logger:  &logger.NoOpLogger{},
 		closers: make([]Closer, 0),
 	}
+
 	for _, opt := range opts {
 		if err := opt(innerCtx, service); err != nil {
 			return nil, err

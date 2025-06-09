@@ -13,18 +13,30 @@ import (
 	"github.com/dtomschitz/headless-go-client/logger"
 	"github.com/dtomschitz/headless-go-client/manifest"
 	"github.com/dtomschitz/headless-go-client/updater"
+	"github.com/kelseyhightower/envconfig"
 )
+
+type Config struct {
+	ConfigManifestURL string `envconfig:"CONFIG_MANIFEST_URL" required:"true"`
+}
 
 func main() {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, commonCtx.DeviceIdKey, "12345")
 	ctx = context.WithValue(ctx, commonCtx.ClientVersionKey, "dev")
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	log := logger.SlogFactory(ctx)
 	log.Info("starting client")
+
+	clientConfig := Config{}
+	err := envconfig.Process("", &clientConfig)
+	if err != nil {
+		log.Error("failed to process client config", err)
+		return
+	}
 
 	closer, err := lifecycle.NewService(ctx, lifecycle.WithLogger(logger.SlogFactory))
 	if err != nil {
@@ -33,7 +45,7 @@ func main() {
 	}
 	defer closer.CloseAll(ctx)
 
-	configService, err := config.NewService(ctx, "http://localhost:8080/config", config.WithLogger(logger.SlogFactory))
+	configService, err := config.NewService(ctx, clientConfig.ConfigManifestURL, config.WithLogger(logger.SlogFactory), config.WithStorage(config.NewFileStorage("./config.json")))
 	if err != nil {
 		log.Error("failed to create config service", err)
 		return
