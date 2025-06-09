@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
 	"github.com/stretchr/testify/assert"
 )
 

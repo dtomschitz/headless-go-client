@@ -1,4 +1,4 @@
-package hash_verifier
+package hash
 
 import (
 	"crypto/md5"

@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dtomschitz/headless-go-client/hash_verifier"
+	hash "github.com/dtomschitz/headless-go-client/common/hash"
 )
 
 type (
@@ -26,7 +26,7 @@ func (m *Manifest) Verify(content []byte) error {
 		return fmt.Errorf("no hash provided")
 	}
 
-	verifier, _, err := hash_verifier.NewVerifierFromHashString(m.Hash)
+	verifier, _, err := hash.NewVerifierFromHashString(m.Hash)
 	if err != nil {
 		return fmt.Errorf("failed to create hash verifier: %w", err)
 	}

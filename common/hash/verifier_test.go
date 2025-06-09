@@ -1,4 +1,4 @@
-package hash_verifier_test
+package hash_test
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dtomschitz/headless-go-client/hash_verifier"
+	commonHash "github.com/dtomschitz/headless-go-client/common/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func TestNewVerifierFromHashString(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			verifier, expected, err := hash_verifier.NewVerifierFromHashString(tc.hashStr)
+			verifier, expected, err := commonHash.NewVerifierFromHashString(tc.hashStr)
 			if tc.shouldErr {
 				assert.Error(t, err)
 				return
@@ -74,7 +74,7 @@ func TestVerifier_Verify(t *testing.T) {
 	}
 }
 
-func createVerifierWithData(t *testing.T, algo string, data []byte) hash_verifier.Verifier {
+func createVerifierWithData(t *testing.T, algo string, data []byte) commonHash.Verifier {
 	var h hash.Hash
 	switch algo {
 	case "md5":
@@ -91,13 +91,13 @@ func createVerifierWithData(t *testing.T, algo string, data []byte) hash_verifie
 	require.NoError(t, err)
 
 	expected := hex.EncodeToString(h.Sum(nil))
-	verifier, err := hash_verifier.NewVerifier(algo, expected)
+	verifier, err := commonHash.NewVerifier(algo, expected)
 	require.NoError(t, err)
 	return verifier
 }
 
 func TestVerifyHash_ErrorOnReadFailure(t *testing.T) {
-	verifier, err := hash_verifier.NewVerifier("md5", "dummy")
+	verifier, err := commonHash.NewVerifier("md5", "dummy")
 	require.NoError(t, err)
 
 	errReader := &errorReader{}
