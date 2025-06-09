@@ -18,6 +18,10 @@ func (s *InMemoryStorage) Get(ctx context.Context) (*Config, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	if s.config == nil {
+		return EmptyConfig, nil
+	}
+
 	return s.config, nil
 }
 
