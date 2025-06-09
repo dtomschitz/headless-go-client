@@ -3,7 +3,7 @@ package http_client
 import (
 	"net/http"
 
-	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
 )
 
 // ContextHeaderTransport adds headers from specific context keys before sending the request

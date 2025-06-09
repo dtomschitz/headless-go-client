@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
 	commonHttp "github.com/dtomschitz/headless-go-client/http"
 	"github.com/dtomschitz/headless-go-client/logger"
 	"github.com/dtomschitz/headless-go-client/manifest"

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
 )
 
 func SlogFactory(ctx context.Context) Logger {

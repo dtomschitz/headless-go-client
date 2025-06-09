@@ -6,14 +6,20 @@ import (
 	"os/signal"
 	"syscall"
 
+	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
 	"github.com/dtomschitz/headless-go-client/config"
 	"github.com/dtomschitz/headless-go-client/event"
 	"github.com/dtomschitz/headless-go-client/lifecycle"
 	"github.com/dtomschitz/headless-go-client/logger"
+	"github.com/dtomschitz/headless-go-client/manifest"
 	"github.com/dtomschitz/headless-go-client/updater"
 )
 
 func main() {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, commonCtx.DeviceIdKey, "12345")
+	ctx = context.WithValue(ctx, commonCtx.ClientVersionKey, "dev")
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -49,14 +55,14 @@ func main() {
 	eventService.RegisterProducer(selfUpdater)
 	closer.Register(selfUpdater)
 
-	selfUpdater.ListenForUpdateAvailable(ctx, func(ctx context.Context, manifest *updater.Manifest) {
+	selfUpdater.ListenForUpdateAvailable(ctx, func(ctx context.Context, manifest *manifest.Manifest) {
 		err := selfUpdater.ApplyUpdate(ctx, manifest)
 		if err != nil {
 
 			return
 		}
 	})
-	selfUpdater.ListenForUpdateApplied(ctx, func(ctx context.Context, manifest *updater.Manifest) {
+	selfUpdater.ListenForUpdateApplied(ctx, func(ctx context.Context, manifest *manifest.Manifest) {
 
 	})
 
