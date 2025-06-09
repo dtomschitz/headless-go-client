@@ -13,20 +13,21 @@ type config struct {
 
 // NewClient returns a *http.Client with retry and context header injection configured.
 func NewClient(opts ...Option) *http.Client {
-	cfg := &config{
+	config := &config{
+		timeout:      60 * time.Second,
 		retryCount:   3,
 		retryBackoff: 500 * time.Millisecond,
 	}
 
 	for _, o := range opts {
-		o(cfg)
+		o(config)
 	}
 
 	ctxTransport := NewContextHeaderTransport(http.DefaultTransport)
-	retryTransport := NewRetryTransport(ctxTransport, cfg.retryCount, cfg.retryBackoff)
+	retryTransport := NewRetryTransport(ctxTransport, config.retryCount, config.retryBackoff)
 
 	return &http.Client{
 		Transport: retryTransport,
-		Timeout:   cfg.timeout,
+		Timeout:   config.timeout,
 	}
 }
