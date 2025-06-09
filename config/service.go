@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,11 +15,12 @@ import (
 
 	commonCtx "github.com/dtomschitz/headless-go-client/context"
 	"github.com/dtomschitz/headless-go-client/logger"
+	"github.com/dtomschitz/headless-go-client/manifest"
 )
 
 type (
 	ConfigService struct {
-		url string
+		manifestURL string
 
 		envKeyPrefix      string
 		extendWithEnvVars bool
@@ -29,6 +29,8 @@ type (
 
 		client *http.Client
 		logger logger.Logger
+
+		manifestRequester manifest.ManifestRequester
 
 		current *Config
 		storage Storage
@@ -45,26 +47,22 @@ const (
 	ServiceName = "ConfigService"
 )
 
-var (
-	// ErrKeyNotFound is returned when a key does not exist.
-	ErrKeyNotFound = errors.New("key not found")
-	// ErrWrongType is returned when the type assertion fails.
-	ErrWrongType = errors.New("wrong type for key")
-)
-
-func NewService(ctx context.Context, url string, opts ...ConfigServiceOption) (*ConfigService, error) {
+func NewService(ctx context.Context, manifestURL string, opts ...ConfigServiceOption) (*ConfigService, error) {
 	internalCtx, internalCancel := context.WithCancel(ctx)
 	internalCtx = context.WithValue(internalCtx, commonCtx.ServiceKey, ServiceName)
 
+	client := &http.Client{Timeout: 5 * time.Second}
+
 	service := &ConfigService{
-		url:              url,
-		initialPollDelay: 1 * time.Minute,
-		pollInterval:     1 * time.Hour,
-		logger:           &logger.NoOpLogger{},
-		client:           &http.Client{Timeout: 5 * time.Second},
-		storage:          NewInMemoryStorage(),
-		internalCtx:      internalCtx,
-		internalCancel:   internalCancel,
+		manifestURL:       manifestURL,
+		initialPollDelay:  1 * time.Minute,
+		pollInterval:      1 * time.Hour,
+		logger:            &logger.NoOpLogger{},
+		client:            client,
+		manifestRequester: manifest.NewDefaultManifestRequester(client),
+		storage:           NewInMemoryStorage(),
+		internalCtx:       internalCtx,
+		internalCancel:    internalCancel,
 	}
 
 	for _, opt := range opts {
@@ -158,9 +156,29 @@ func (cs *ConfigService) Refresh(ctx context.Context) error {
 }
 
 func (cs *ConfigService) refresh(ctx context.Context) error {
-	newConfig, err := cs.fetchFromRemote(ctx)
+	manifest, err := cs.manifestRequester.Fetch(ctx, cs.manifestURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch manifest: %w", err)
+	}
+
+	config, err := cs.fetchFromRemote(ctx, manifest.URL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch config: %w", err)
+	}
+
+	if err := manifest.Verify(config); err != nil {
+		return fmt.Errorf("failed to verify config: %w", err)
+	}
+
+	var properties Properties
+	if err := json.Unmarshal(config, &properties); err != nil {
+		return fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	newConfig := &Config{
+		Version:    manifest.Version,
+		Hash:       manifest.Hash,
+		Properties: properties,
 	}
 
 	if cs.extendWithEnvVars {
@@ -189,8 +207,8 @@ func (cs *ConfigService) refresh(ctx context.Context) error {
 	return nil
 }
 
-func (cs *ConfigService) fetchFromRemote(ctx context.Context) (*Config, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cs.url, nil)
+func (cs *ConfigService) fetchFromRemote(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -205,14 +223,9 @@ func (cs *ConfigService) fetchFromRemote(ctx context.Context) (*Config, error) {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	config, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var config *Config
-	if err := json.Unmarshal(body, &config); err != nil {
-		return nil, fmt.Errorf("invalid config JSON: %w", err)
 	}
 
 	return config, nil

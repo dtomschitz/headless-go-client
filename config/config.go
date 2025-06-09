@@ -1,14 +1,27 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 )
 
-type Config struct {
-	Version    string                 `json:"version"`
-	Properties map[string]interface{} `json:"properties"`
-}
+type (
+	Config struct {
+		Version    string     `json:"version"`
+		Hash       string     `json:"hash"`
+		Properties Properties `json:"properties"`
+	}
+
+	Properties map[string]interface{}
+)
+
+var (
+	// ErrKeyNotFound is returned when a key does not exist.
+	ErrKeyNotFound = errors.New("key not found")
+	// ErrWrongType is returned when the type assertion fails.
+	ErrWrongType = errors.New("wrong type for key")
+)
 
 // GetString retrieves a string value from the configuration.
 // It returns an error if the key is not found or the value is not a string.

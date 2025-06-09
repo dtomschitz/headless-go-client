@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dtomschitz/headless-go-client/logger"
+	"github.com/dtomschitz/headless-go-client/manifest"
 )
 
 type ConfigServiceOption func(context.Context, *ConfigService) error
@@ -58,6 +59,16 @@ func WithHTTPClient(client *http.Client) ConfigServiceOption {
 		}
 
 		service.client = client
+		return nil
+	}
+}
+
+func WithManifestRequester(requester manifest.ManifestRequester) ConfigServiceOption {
+	return func(ctx context.Context, service *ConfigService) error {
+		if requester == nil {
+			return errors.New("manifest requester is not provided")
+		}
+		service.manifestRequester = requester
 		return nil
 	}
 }
