@@ -50,7 +50,7 @@ const (
 	UpdateAppliedEvent         event.EventType = "update_applied"
 )
 
-func NewService(ctx context.Context, currentClientVersion string, opts ...Option) (*Updater, error) {
+func NewService(ctx context.Context, manifestURL string, currentClientVersion string, opts ...Option) (*Updater, error) {
 	internalCtx, internalCancel := context.WithCancel(ctx)
 	internalCtx = context.WithValue(internalCtx, commonCtx.ServiceKey, ServiceName)
 
@@ -66,6 +66,7 @@ func NewService(ctx context.Context, currentClientVersion string, opts ...Option
 
 	updater := &Updater{
 		currentVersion:      currentClientVersion,
+		manifestURL:         manifestURL,
 		updateRequester:     &DefaultUpdateRequester{Client: httpClient},
 		manifestRequester:   manifest.NewDefaultManifestRequester(httpClient),
 		initialPollDelay:    1 * time.Minute,
@@ -107,6 +108,10 @@ func (updater *Updater) start(ctx context.Context) {
 			case <-time.After(updater.initialPollDelay):
 				updater.logger.Info("initial poll delay completed, starting service")
 			}
+		}
+
+		if err := updater.TriggerUpdateCheck(ctx); err != nil {
+			updater.logger.Error("initial update check failed", "error", err)
 		}
 
 		ticker := time.NewTicker(updater.pollInterval)
@@ -202,6 +207,8 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *manifest.Mani
 
 	if err := updater.applyUpdate(ctx, manifest); err != nil {
 		err = fmt.Errorf("failed to apply update: %w", err)
+
+		updater.logger.Error("failed to apply update", "error", err)
 		updater.events.Push(event.NewEventFromError(ctx, UpdateAppliedEvent, err, eventOpts))
 		return err
 	}
@@ -241,6 +248,8 @@ func (updater *Updater) applyUpdate(ctx context.Context, manifest *manifest.Mani
 		return fmt.Errorf("failed to find current binary: %w", err)
 	}
 
+	updater.logger.Debug("resolved current binary path", "execPath", execPath)
+
 	tmpFile, err := createTempBinaryFile(binary)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %w", err)
@@ -278,7 +287,7 @@ func replaceBinary(currentPath, newBinaryPath string) error {
 
 	if err := os.Rename(newBinaryPath, currentPath); err != nil {
 		_ = os.Rename(backupPath, currentPath)
-		return fmt.Errorf("failed to replace binary: %w", err)
+		return err
 	}
 
 	_ = os.Remove(backupPath)
