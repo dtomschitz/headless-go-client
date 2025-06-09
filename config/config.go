@@ -27,11 +27,17 @@ var (
 	ErrKeyNotFound = errors.New("key not found")
 	// ErrWrongType is returned when the type assertion fails.
 	ErrWrongType = errors.New("wrong type for key")
+
+	EmptyConfig = &Config{}
 )
 
 // GetString retrieves a string value from the configuration.
 // It returns an error if the key is not found or the value is not a string.
 func (c *Config) GetString(key string) (string, error) {
+	if c == nil {
+		return "", errors.New("config is nil")
+	}
+
 	val, ok := c.Properties[key]
 	if !ok {
 		return "", fmt.Errorf("%w: %s", ErrKeyNotFound, key)
@@ -52,6 +58,10 @@ func (c *Config) GetString(key string) (string, error) {
 // GetInt retrieves an integer value from the configuration.
 // It returns an error if the key is not found or the value is not an integer.
 func (c *Config) GetInt(key string) (int, error) {
+	if c == nil {
+		return 0, errors.New("config is nil")
+	}
+
 	val, ok := c.Properties[key]
 	if !ok {
 		return 0, fmt.Errorf("%w: %s", ErrKeyNotFound, key)
@@ -86,6 +96,10 @@ func (c *Config) GetInt(key string) (int, error) {
 // GetBool retrieves a boolean value from the configuration.
 // It returns an error if the key is not found or the value is not a boolean.
 func (c *Config) GetBool(key string) (bool, error) {
+	if c == nil {
+		return false, errors.New("config is nil")
+	}
+
 	val, ok := c.Properties[key]
 	if !ok {
 		return false, fmt.Errorf("%w: %s", ErrKeyNotFound, key)
@@ -111,6 +125,10 @@ func (c *Config) GetBool(key string) (bool, error) {
 // GetFloat64 retrieves a float64 value from the configuration.
 // It returns an error if the key is not found or the value is not a float64.
 func (c *Config) GetFloat64(key string) (float64, error) {
+	if c == nil {
+		return 0, errors.New("config is nil")
+	}
+
 	val, ok := c.Properties[key]
 	if !ok {
 		return 0, fmt.Errorf("%w: %s", ErrKeyNotFound, key)
