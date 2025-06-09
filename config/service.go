@@ -86,12 +86,9 @@ func NewService(ctx context.Context, manifestURL string, opts ...ConfigServiceOp
 		return nil, fmt.Errorf("failed to load initial config from storage: %w", err)
 	}
 
-	if service.current == nil {
-		service.current = &Config{}
-		if err := service.Refresh(ctx); err != nil {
-			internalCancel()
-			return nil, err
-		}
+	if err := service.Refresh(ctx); err != nil {
+		internalCancel()
+		return nil, err
 	}
 
 	service.start(internalCtx)
@@ -182,7 +179,7 @@ func (cs *ConfigService) refresh(ctx context.Context) error {
 	}
 
 	if cs.current != nil && manifest.Version == cs.current.Version && manifest.Hash == cs.current.Hash {
-		cs.logger.Info("config version is up to date", "version", manifest.Version)
+		cs.logger.Info("config is up to date", "version", manifest.Version)
 		return nil
 	}
 
@@ -222,7 +219,6 @@ func (cs *ConfigService) refresh(ctx context.Context) error {
 
 	if isConfigContentEqual(newConfig, cs.current) {
 		cs.logger.Info("config properties have not changed")
-		return nil
 	}
 
 	if err := cs.storage.Save(ctx, newConfig); err != nil {
@@ -308,6 +304,7 @@ func deepCopyConfig(config *Config) *Config {
 		Version:    config.Version,
 		Properties: make(map[string]interface{}, len(config.Properties)),
 	}
+
 	for k, v := range config.Properties {
 		copied.Properties[k] = v
 	}
