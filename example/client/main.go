@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
 	"github.com/dtomschitz/headless-go-client/config"
@@ -17,8 +18,9 @@ import (
 )
 
 type Config struct {
-	ConfigManifestURL string `envconfig:"CONFIG_MANIFEST_URL" required:"true"`
-	ConfigStorageURL  string `envconfig:"CONFIG_STORAGE_URL" required:"true" default:"./config.json"`
+	SelfUpdateManifestURL string `envconfig:"SELF_UPDATE_MANIFEST_URL" required:"true"`
+	ConfigManifestURL     string `envconfig:"CONFIG_MANIFEST_URL" required:"true"`
+	ConfigStorageURL      string `envconfig:"CONFIG_STORAGE_URL" required:"true" default:"./config.json"`
 }
 
 func main() {
@@ -30,7 +32,6 @@ func main() {
 	defer stop()
 
 	log := logger.SlogFactory(ctx)
-	log.Info("starting client")
 
 	clientConfig := Config{}
 	err := envconfig.Process("", &clientConfig)
@@ -38,6 +39,8 @@ func main() {
 		log.Error("failed to process client config", err)
 		return
 	}
+
+	log.Info("starting client", "config", clientConfig)
 
 	closer, err := lifecycle.NewService(ctx, lifecycle.WithLogger(logger.SlogFactory))
 	if err != nil {
@@ -61,7 +64,7 @@ func main() {
 	}
 	closer.Register(eventService)
 
-	selfUpdater, err := updater.NewService(ctx, "dev", updater.WithLogger(logger.SlogFactory))
+	selfUpdater, err := updater.NewService(ctx, clientConfig.SelfUpdateManifestURL, "dev", updater.WithLogger(logger.SlogFactory), updater.WithInitialPollDelay(time.Second))
 	if err != nil {
 		log.Error("failed to create update service", err)
 		return

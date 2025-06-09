@@ -11,8 +11,8 @@ import (
 	_ "embed"
 )
 
-//go:embed dummy_data/manifest.json
-var dummyManifest []byte
+//go:embed dummy_data/config_manifest.json
+var dummyConfigManifest []byte
 
 //go:embed dummy_data/config.json
 var dummyConfig []byte
@@ -78,7 +78,7 @@ func (h *ConfigHandler) GetLatestManifest(c *gin.Context) {
 		return
 	}*/
 
-	logger.With("manifest", string(dummyManifest)).Info("fetch latest manifest")
+	logger.With("manifest", string(dummyConfigManifest)).Info("fetch latest manifest")
 
-	c.Data(http.StatusOK, "application/json", dummyManifest)
+	c.Data(http.StatusOK, "application/json", dummyConfigManifest)
 }

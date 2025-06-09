@@ -9,6 +9,7 @@ func StartServer(configService *internal.ConfigService) error {
 	router := gin.Default()
 
 	configHandler := NewConfigHandler(configService)
+	clientUpdateHandler := NewClientUpdateHandler()
 
 	// API Group
 	api := router.Group("/api/v1")
@@ -18,6 +19,12 @@ func StartServer(configService *internal.ConfigService) error {
 			configs.POST("", configHandler.CreateConfig)
 			configs.GET("/:version/properties", configHandler.GetConfigByVersion)
 			configs.GET("/manifest", configHandler.GetLatestManifest)
+		}
+
+		clientUpdate := api.Group("/client")
+		{
+			clientUpdate.GET("/:version/binary", clientUpdateHandler.GetBinaryByVersion)
+			clientUpdate.GET("/manifest", clientUpdateHandler.GetLatestManifest)
 		}
 	}
 
