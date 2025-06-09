@@ -10,6 +10,7 @@ import (
 	"time"
 
 	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	commonHttp "github.com/dtomschitz/headless-go-client/http"
 	"github.com/dtomschitz/headless-go-client/logger"
 )
 
@@ -56,12 +57,14 @@ func defaultRequestBuilder(endpoint string) RequestBuilder {
 func NewService(ctx context.Context, endpoint string, opts ...ServiceOption) (*Service, error) {
 	internalCtx, internalCancel := context.WithCancel(context.WithValue(ctx, commonCtx.ServiceKey, ServiceName))
 
+	httpClient := commonHttp.NewClient()
+
 	service := &Service{
 		internalCtx:    internalCtx,
 		internalCancel: internalCancel,
 		endpoint:       endpoint,
 		interval:       1 * time.Minute,
-		client:         &http.Client{Timeout: 5 * time.Second},
+		client:         httpClient,
 		logger:         &logger.NoOpLogger{},
 		requestBuilder: defaultRequestBuilder(endpoint),
 	}

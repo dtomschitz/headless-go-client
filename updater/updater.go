@@ -6,13 +6,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"sync"
 	"time"
 
 	commonCtx "github.com/dtomschitz/headless-go-client/context"
 	"github.com/dtomschitz/headless-go-client/event"
+	commonHttp "github.com/dtomschitz/headless-go-client/http"
 	"github.com/dtomschitz/headless-go-client/logger"
 )
 
@@ -63,7 +63,7 @@ func NewService(ctx context.Context, currentClientVersion string, opts ...Option
 		}
 	}
 
-	httpClient := &http.Client{}
+	httpClient := commonHttp.NewClient()
 
 	updater := &Updater{
 		currentVersion:      currentClientVersion,

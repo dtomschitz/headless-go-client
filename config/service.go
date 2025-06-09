@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	commonCtx "github.com/dtomschitz/headless-go-client/context"
+	commonHttp "github.com/dtomschitz/headless-go-client/http"
 	"github.com/dtomschitz/headless-go-client/logger"
 	"github.com/dtomschitz/headless-go-client/manifest"
 )
@@ -51,7 +52,7 @@ func NewService(ctx context.Context, manifestURL string, opts ...ConfigServiceOp
 	internalCtx, internalCancel := context.WithCancel(ctx)
 	internalCtx = context.WithValue(internalCtx, commonCtx.ServiceKey, ServiceName)
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := commonHttp.NewClient()
 
 	service := &ConfigService{
 		manifestURL:       manifestURL,
