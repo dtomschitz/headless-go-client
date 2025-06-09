@@ -14,7 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
-	commonHttp "github.com/dtomschitz/headless-go-client/http"
+	commonHttp "github.com/dtomschitz/headless-go-client/common/http"
 	"github.com/dtomschitz/headless-go-client/logger"
 	"github.com/dtomschitz/headless-go-client/manifest"
 )

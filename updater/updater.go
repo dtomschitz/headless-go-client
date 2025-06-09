@@ -9,8 +9,8 @@ import (
 	"time"
 
 	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
+	commonHttp "github.com/dtomschitz/headless-go-client/common/http"
 	"github.com/dtomschitz/headless-go-client/event"
-	commonHttp "github.com/dtomschitz/headless-go-client/http"
 	"github.com/dtomschitz/headless-go-client/logger"
 	"github.com/dtomschitz/headless-go-client/manifest"
 )
