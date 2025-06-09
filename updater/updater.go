@@ -2,8 +2,6 @@ package updater
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +12,7 @@ import (
 	"github.com/dtomschitz/headless-go-client/event"
 	commonHttp "github.com/dtomschitz/headless-go-client/http"
 	"github.com/dtomschitz/headless-go-client/logger"
+	"github.com/dtomschitz/headless-go-client/manifest"
 )
 
 type (
@@ -26,10 +25,10 @@ type (
 		logger            logger.Logger
 		events            event.Emitter
 		updateRequester   UpdateRequester
-		manifestRequester ManifestRequester
+		manifestRequester manifest.ManifestRequester
 
-		updateAvailableChan chan *Manifest
-		updateAppliedChan   chan *Manifest
+		updateAvailableChan chan *manifest.Manifest
+		updateAppliedChan   chan *manifest.Manifest
 
 		internalCtx    context.Context
 		internalCancel context.CancelFunc
@@ -37,7 +36,7 @@ type (
 		shutdownOnce   sync.Once
 	}
 
-	UpdateEventFunc func(ctx context.Context, mainfest *Manifest)
+	UpdateEventFunc func(ctx context.Context, mainfest *manifest.Manifest)
 )
 
 const (
@@ -68,13 +67,13 @@ func NewService(ctx context.Context, currentClientVersion string, opts ...Option
 	updater := &Updater{
 		currentVersion:      currentClientVersion,
 		updateRequester:     &DefaultUpdateRequester{Client: httpClient},
-		manifestRequester:   &DefaultManifestRequester{client: httpClient},
+		manifestRequester:   manifest.NewDefaultManifestRequester(httpClient),
 		initialPollDelay:    1 * time.Minute,
 		pollInterval:        1 * time.Hour,
 		logger:              &logger.NoOpLogger{},
 		events:              &event.NoopEmitter{},
-		updateAvailableChan: make(chan *Manifest, 1),
-		updateAppliedChan:   make(chan *Manifest, 1),
+		updateAvailableChan: make(chan *manifest.Manifest, 1),
+		updateAppliedChan:   make(chan *manifest.Manifest, 1),
 		internalCtx:         internalCtx,
 		internalCancel:      internalCancel,
 	}
@@ -163,7 +162,7 @@ func (updater *Updater) ListenForUpdateApplied(ctx context.Context, fn UpdateEve
 	updater.eventListener(ctx, updater.updateAppliedChan, fn)
 }
 
-func (updater *Updater) eventListener(ctx context.Context, updateChan chan *Manifest, fn UpdateEventFunc) {
+func (updater *Updater) eventListener(ctx context.Context, updateChan chan *manifest.Manifest, fn UpdateEventFunc) {
 	go func() {
 		for {
 			select {
@@ -197,7 +196,7 @@ func (updater *Updater) TriggerUpdateCheck(ctx context.Context) error {
 	return nil
 }
 
-func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) error {
+func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *manifest.Manifest) error {
 	eventOpts := event.WithDataField("manifest", manifest)
 	updater.events.Push(event.NewEvent(ctx, UpdateStartedEvent, eventOpts))
 
@@ -213,44 +212,41 @@ func (updater *Updater) ApplyUpdate(ctx context.Context, manifest *Manifest) err
 	return nil
 }
 
-func (updater *Updater) applyUpdate(ctx context.Context, manifest *Manifest) error {
+func (updater *Updater) applyUpdate(ctx context.Context, manifest *manifest.Manifest) error {
 	updater.logger.Info("going to apply update", "version", manifest.Version)
 	updater.events.Push(event.NewEvent(ctx, UpdateDownloadStartedEvent))
 
-	binary, err := updater.updateRequester.Fetch(ctx, manifest)
+	binaryReader, err := updater.updateRequester.Fetch(ctx, manifest)
 	if err != nil {
 		return fmt.Errorf("failed to fetch update %s: %w", manifest.Version, err)
 	}
-	defer binary.Close()
+	defer binaryReader.Close()
+
+	binary, err := io.ReadAll(binaryReader)
+	if err != nil {
+		return fmt.Errorf("failed to read binary: %w", err)
+	}
 
 	updater.events.Push(event.NewEvent(ctx, UpdateDownloadedEvent))
 	updater.logger.Debug("update fetched successfully", "version", manifest.Version)
+
+	if err := manifest.Verify(binary); err != nil {
+		return fmt.Errorf("failed to verify update %s: %w", manifest.Version, err)
+	}
+
+	updater.logger.Debug("going to proceed with update because checksum matches")
 
 	execPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to find current binary: %w", err)
 	}
 
-	tmpFile, err := os.CreateTemp("", "update-*")
+	tmpFile, err := createTempBinaryFile(binary)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
 	defer os.Remove(tmpFile.Name())
-
-	hasher := sha256.New()
-	multiWriter := io.MultiWriter(tmpFile, hasher)
-
-	if _, err := io.Copy(multiWriter, binary); err != nil {
-		return fmt.Errorf("failed to write binary to temp file: %w", err)
-	}
-
-	if manifest.SHA256 != "" {
-		actualHash := hex.EncodeToString(hasher.Sum(nil))
-		if actualHash != manifest.SHA256 {
-			return fmt.Errorf("updated stopped because checksum mismatch: expected %s, actual %s", manifest.SHA256, actualHash)
-		}
-		updater.logger.Debug("going to proceed with update because checksum matches")
-	}
+	defer tmpFile.Close()
 
 	if err := replaceBinary(execPath, tmpFile.Name()); err != nil {
 		return fmt.Errorf("failed to replace current binary: %w", err)
@@ -261,7 +257,7 @@ func (updater *Updater) applyUpdate(ctx context.Context, manifest *Manifest) err
 	return nil
 }
 
-func (updater *Updater) checkIfUpdateIsAvailable(ctx context.Context) (*Manifest, bool, error) {
+func (updater *Updater) checkIfUpdateIsAvailable(ctx context.Context) (*manifest.Manifest, bool, error) {
 	manifest, err := updater.manifestRequester.Fetch(ctx, updater.manifestURL)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to fetch manifest: %w", err)
@@ -292,4 +288,21 @@ func replaceBinary(currentPath, newBinaryPath string) error {
 	}
 
 	return nil
+}
+
+func createTempBinaryFile(binary []byte) (*os.File, error) {
+	tmpFile, err := os.CreateTemp("", "update-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.Write(binary); err != nil {
+		return nil, fmt.Errorf("failed to write binary to temp file: %w", err)
+	}
+	if err := tmpFile.Chmod(0755); err != nil {
+		return nil, fmt.Errorf("failed to make temp file executable: %w", err)
+	}
+
+	return tmpFile, nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dtomschitz/headless-go-client/event"
 	"github.com/dtomschitz/headless-go-client/logger"
+	"github.com/dtomschitz/headless-go-client/manifest"
 )
 
 type Option func(context.Context, *Updater) error
@@ -22,7 +23,7 @@ func WithUpdateRequester(requester UpdateRequester) Option {
 	}
 }
 
-func WithManifestRequester(requester ManifestRequester) Option {
+func WithManifestRequester(requester manifest.ManifestRequester) Option {
 	return func(ctx context.Context, updater *Updater) error {
 		if requester == nil {
 			return errors.New("manifest requester is not provided")
