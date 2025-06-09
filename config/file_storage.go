@@ -12,6 +12,8 @@ type FileStorage struct {
 	mu   sync.RWMutex
 }
 
+var _ ConfigStorage = &FileStorage{}
+
 func NewFileStorage(path string) *FileStorage {
 	return &FileStorage{path: path}
 }
@@ -36,7 +38,7 @@ func (fs *FileStorage) Get(ctx context.Context) (*Config, error) {
 	return &config, nil
 }
 
-func (fs *FileStorage) Set(ctx context.Context, config *Config) error {
+func (fs *FileStorage) Save(ctx context.Context, config *Config) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 

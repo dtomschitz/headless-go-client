@@ -49,7 +49,7 @@ func TestFileStorageGetAndSet(t *testing.T) {
 			"port":     8080,
 		},
 	}
-	err = storage.Set(ctx, testConfig)
+	err = storage.Save(ctx, testConfig)
 
 	// then
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestFileStorageGetAndSet(t *testing.T) {
 			"rate":    1.25,
 		},
 	}
-	err = storage.Set(ctx, newConfig)
+	err = storage.Save(ctx, newConfig)
 
 	// then
 	require.NoError(t, err)
@@ -155,7 +155,7 @@ func TestFileStorageSetAtomicWrite(t *testing.T) {
 
 	newConfig := &Config{Version: "v2.0", Properties: map[string]interface{}{"new": "data"}}
 
-	err = storage.Set(ctx, newConfig)
+	err = storage.Save(ctx, newConfig)
 	require.NoError(t, err)
 
 	tmpFilePath := filePath + ".tmp"
@@ -192,7 +192,7 @@ func TestFileStorageConcurrentAccess(t *testing.T) {
 						"time":   time.Now().Format(time.RFC3339Nano),
 					},
 				}
-				err := storage.Set(ctx, configToSave)
+				err := storage.Save(ctx, configToSave)
 				require.NoError(t, err)
 			}
 		}(i)

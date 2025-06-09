@@ -34,7 +34,7 @@ type (
 		manifestRequester manifest.ManifestRequester
 
 		current *Config
-		storage Storage
+		storage ConfigStorage
 		mu      sync.RWMutex
 
 		internalCtx    context.Context
@@ -76,12 +76,14 @@ func NewService(ctx context.Context, manifestURL string, opts ...ConfigServiceOp
 	var err error
 	service.current, err = service.storage.Get(internalCtx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load initial config: %w", err)
+		return nil, fmt.Errorf("failed to load initial config from storage: %w", err)
 	}
 
 	if service.current == nil {
-		if err := service.Refresh(internalCtx); err != nil {
-			service.logger.Error("failed to load initial config from remote: %w", err)
+		service.current = &Config{}
+		if err := service.Refresh(ctx); err != nil {
+			internalCancel()
+			return nil, err
 		}
 	}
 
@@ -157,19 +159,32 @@ func (cs *ConfigService) Refresh(ctx context.Context) error {
 }
 
 func (cs *ConfigService) refresh(ctx context.Context) error {
+	cs.logger.Info("refreshing config from remote")
+
 	manifest, err := cs.manifestRequester.Fetch(ctx, cs.manifestURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch manifest: %w", err)
 	}
+
+	if cs.current != nil && manifest.Version == cs.current.Version && manifest.Hash == cs.current.Hash {
+		cs.logger.Info("config version is up to date", "version", manifest.Version)
+		return nil
+	}
+
+	cs.logger.Info("fetched latest manifest for client", "version", manifest.Version)
 
 	config, err := cs.fetchFromRemote(ctx, manifest.URL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch config: %w", err)
 	}
 
+	cs.logger.Info("fetched latest remote config", "version", manifest.Version)
+
 	if err := manifest.Verify(config); err != nil {
 		return fmt.Errorf("failed to verify config: %w", err)
 	}
+
+	cs.logger.Info("verified config")
 
 	var properties Properties
 	if err := json.Unmarshal(config, &properties); err != nil {
@@ -189,11 +204,6 @@ func (cs *ConfigService) refresh(ctx context.Context) error {
 
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-
-	if cs.current != nil && newConfig.Version == cs.current.Version {
-		cs.logger.Info("config version is up to date", "version", newConfig.Version)
-		return nil
-	}
 
 	if isConfigContentEqual(newConfig, cs.current) {
 		cs.logger.Info("config properties have not changed")
@@ -216,7 +226,7 @@ func (cs *ConfigService) fetchFromRemote(ctx context.Context, url string) ([]byt
 
 	resp, err := cs.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch config: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -266,13 +276,17 @@ func (cs *ConfigService) extendWithEnvironmentVariables(baseConfig *Config) *Con
 	return baseConfig
 }
 
-func isConfigContentEqual(a, b *Config) bool {
-	return cmp.Equal(a.Properties, b.Properties)
+func isConfigContentEqual(actual, new *Config) bool {
+	if actual == nil || new == nil {
+		return false
+	}
+
+	return cmp.Equal(actual.Properties, new.Properties)
 }
 
 func deepCopyConfig(config *Config) *Config {
 	if config == nil {
-		return nil
+		return &Config{}
 	}
 
 	copied := &Config{

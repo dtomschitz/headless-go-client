@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -14,6 +15,11 @@ type (
 	}
 
 	Properties map[string]interface{}
+
+	ConfigStorage interface {
+		Get(ctx context.Context) (*Config, error)
+		Save(ctx context.Context, config *Config) error
+	}
 )
 
 var (

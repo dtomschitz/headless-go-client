@@ -73,6 +73,17 @@ func WithManifestRequester(requester manifest.ManifestRequester) ConfigServiceOp
 	}
 }
 
+func WithStorage(storage ConfigStorage) ConfigServiceOption {
+	return func(ctx context.Context, service *ConfigService) error {
+		if storage == nil {
+			return errors.New("storage impl is not provided")
+		}
+
+		service.storage = storage
+		return nil
+	}
+}
+
 func WithLogger(factory logger.Factory) ConfigServiceOption {
 	return func(ctx context.Context, service *ConfigService) error {
 		if factory == nil {

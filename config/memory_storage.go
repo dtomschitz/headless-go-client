@@ -17,6 +17,7 @@ func NewInMemoryStorage() *InMemoryStorage {
 func (s *InMemoryStorage) Get(ctx context.Context) (*Config, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	return s.config, nil
 }
 
