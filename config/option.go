@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dtomschitz/headless-go-client/event"
 	"github.com/dtomschitz/headless-go-client/logger"
 	"github.com/dtomschitz/headless-go-client/manifest"
 )
@@ -80,6 +81,16 @@ func WithStorage(storage ConfigStorage) ConfigServiceOption {
 		}
 
 		service.storage = storage
+		return nil
+	}
+}
+
+func WithEventEmitter(emitter event.Emitter) ConfigServiceOption {
+	return func(ctx context.Context, service *ConfigService) error {
+		if emitter == nil {
+			return errors.New("event emitter is not provided")
+		}
+		service.events = emitter
 		return nil
 	}
 }

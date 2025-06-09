@@ -30,7 +30,7 @@ func NewService(ctx context.Context, opts ...Option) (*LifecycleService, error) 
 
 	service := &LifecycleService{
 		mu:      sync.Mutex{},
-		logger:  &logger.NoOpLogger{},
+		logger:  &logger.NoopLogger{},
 		closers: make([]Closer, 0),
 	}
 

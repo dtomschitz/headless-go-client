@@ -65,7 +65,7 @@ func NewService(ctx context.Context, endpoint string, opts ...ServiceOption) (*S
 		endpoint:       endpoint,
 		interval:       1 * time.Minute,
 		client:         httpClient,
-		logger:         &logger.NoOpLogger{},
+		logger:         &logger.NoopLogger{},
 		requestBuilder: defaultRequestBuilder(endpoint),
 	}
 

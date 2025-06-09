@@ -26,6 +26,6 @@ func TestNewLogger(t *testing.T) {
 
 	t.Run("WithoutFactory", func(t *testing.T) {
 		log := logger.New(context.Background(), nil)
-		assert.IsType(t, &logger.NoOpLogger{}, log, "expected logger to be of type NoOpLogger")
+		assert.IsType(t, &logger.NoopLogger{}, log, "expected logger to be of type NoOpLogger")
 	})
 }

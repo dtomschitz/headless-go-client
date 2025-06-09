@@ -15,6 +15,7 @@ import (
 
 	commonCtx "github.com/dtomschitz/headless-go-client/common/context"
 	commonHttp "github.com/dtomschitz/headless-go-client/common/http"
+	"github.com/dtomschitz/headless-go-client/event"
 	"github.com/dtomschitz/headless-go-client/logger"
 	"github.com/dtomschitz/headless-go-client/manifest"
 )
@@ -30,6 +31,7 @@ type (
 
 		client *http.Client
 		logger logger.Logger
+		events event.Emitter
 
 		manifestRequester manifest.ManifestRequester
 
@@ -46,6 +48,10 @@ type (
 
 const (
 	ServiceName = "ConfigService"
+
+	RefreshConfigEvent   event.EventType = "config_refresh"
+	ConfigAvailableEvent event.EventType = "config_available"
+	ConfigRefreshedEvent event.EventType = "config_refreshed"
 )
 
 func NewService(ctx context.Context, manifestURL string, opts ...ConfigServiceOption) (*ConfigService, error) {
@@ -58,7 +64,8 @@ func NewService(ctx context.Context, manifestURL string, opts ...ConfigServiceOp
 		manifestURL:       manifestURL,
 		initialPollDelay:  1 * time.Minute,
 		pollInterval:      1 * time.Hour,
-		logger:            &logger.NoOpLogger{},
+		logger:            &logger.NoopLogger{},
+		events:            &event.NoopEmitter{},
 		client:            client,
 		manifestRequester: manifest.NewDefaultManifestRequester(client),
 		storage:           NewInMemoryStorage(),
@@ -155,12 +162,20 @@ func (cs *ConfigService) Current() *Config {
 }
 
 func (cs *ConfigService) Refresh(ctx context.Context) error {
-	return cs.refresh(ctx)
+	cs.logger.Info("refreshing config from remote")
+	cs.events.Push(event.NewEvent(ctx, RefreshConfigEvent))
+
+	if err := cs.refresh(ctx); err != nil {
+		cs.events.Push(event.NewEventFromError(ctx, RefreshConfigEvent, err))
+		return fmt.Errorf("failed to refresh config: %w", err)
+	}
+
+	cs.logger.Info("config refreshed successfully")
+	cs.events.Push(event.NewEvent(ctx, ConfigRefreshedEvent))
+	return nil
 }
 
 func (cs *ConfigService) refresh(ctx context.Context) error {
-	cs.logger.Info("refreshing config from remote")
-
 	manifest, err := cs.manifestRequester.Fetch(ctx, cs.manifestURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch manifest: %w", err)

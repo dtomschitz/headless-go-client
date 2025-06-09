@@ -18,6 +18,7 @@ import (
 
 type Config struct {
 	ConfigManifestURL string `envconfig:"CONFIG_MANIFEST_URL" required:"true"`
+	ConfigStorageURL  string `envconfig:"CONFIG_STORAGE_URL" required:"true" default:"./config.json"`
 }
 
 func main() {
@@ -45,7 +46,8 @@ func main() {
 	}
 	defer closer.CloseAll(ctx)
 
-	configService, err := config.NewService(ctx, clientConfig.ConfigManifestURL, config.WithLogger(logger.SlogFactory), config.WithStorage(config.NewFileStorage("./config.json")))
+	configStorage := config.NewFileStorage(clientConfig.ConfigStorageURL)
+	configService, err := config.NewService(ctx, clientConfig.ConfigManifestURL, config.WithLogger(logger.SlogFactory), config.WithStorage(configStorage))
 	if err != nil {
 		log.Error("failed to create config service", err)
 		return

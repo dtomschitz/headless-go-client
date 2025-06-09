@@ -70,7 +70,7 @@ func NewService(ctx context.Context, currentClientVersion string, opts ...Option
 		manifestRequester:   manifest.NewDefaultManifestRequester(httpClient),
 		initialPollDelay:    1 * time.Minute,
 		pollInterval:        1 * time.Hour,
-		logger:              &logger.NoOpLogger{},
+		logger:              &logger.NoopLogger{},
 		events:              &event.NoopEmitter{},
 		updateAvailableChan: make(chan *manifest.Manifest, 1),
 		updateAppliedChan:   make(chan *manifest.Manifest, 1),
